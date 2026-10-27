@@ -21,10 +21,12 @@ $menu = [
     ['Empresas', '/empresas', [Papel::CadastroEmpresa]],
     ['Catracas', '/catracas', [Papel::CadastroEmpresa]],
     ['Pessoas', '/pessoas', [Papel::CadastroPessoa]],
+    ['Relatórios', '/relatorios', [Papel::Consulta]],
     ['Alertas', '/alertas', [Papel::Consulta]],
     ['Perfis', '/perfis', [Papel::Administrador]],
     ['Termos LGPD', '/termos', [Papel::Administrador]],
     ['Usuários', '/usuarios', [Papel::Administrador]],
+    ['Auditoria', '/auditoria', [Papel::Administrador]],
 ];
 
 if (\CadGestor\Nucleo\Visao::compartilhado('simulador_disponivel', false)) {

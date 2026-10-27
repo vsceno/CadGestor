@@ -381,6 +381,20 @@ curl -X POST http://cadgestor.test/api/v1/acesso \
   -d "{\"tipo\":\"digital\",\"referencia\":\"<uuid>\",\"score\":0.95}"
 ```
 
+### Relatórios, CSV e auditoria (Fase 8)
+
+- **Relatórios** (`/relatorios`, papel `consulta`): filtros por período (datas locais
+  inclusivas, até 366 dias), empresa, perfil, catraca e resultado. Mostram resumos
+  **por perfil**, **por empresa**, por motivo de negação e por dia, além da lista de
+  eventos. Os filtros vão na URL porque são apenas datas e UUIDs.
+- **Exportação CSV**: UTF-8 com BOM e `;`, que o Excel em português abre direto, com
+  **proteção contra injeção de fórmula** (células começando com `= + - @` viram
+  texto). O CPF sai **mascarado** e cada exportação é registrada na auditoria (quem,
+  quando, filtros e número de linhas, sem o conteúdo).
+- **Trilha de auditoria** (`/auditoria`, administrador): filtros por período, ação,
+  tabela e usuário, exibição de "antes/depois" e exportação CSV. O papel da aplicação
+  não consegue alterar nem apagar esses registros.
+
 ### Modelo de dados (Fase 1)
 
 | Grupo | Tabelas |
@@ -432,5 +446,5 @@ curl -X POST http://cadgestor.test/api/v1/acesso \
 - [x] Fase 5: pessoas, vÃ­nculos e regras de acesso
 - [x] Fase 6: consentimento LGPD e biometria cifrada
 - [x] Fase 7: API da catraca e motor de decisÃ£o
-- [ ] Fase 8: relatÃ³rios, CSV e auditoria
+- [x] Fase 8: relatÃ³rios, CSV e auditoria
 - [ ] Fase 9: jobs de manutenÃ§Ã£o, testes e revisÃ£o de seguranÃ§a

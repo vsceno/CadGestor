@@ -11,6 +11,7 @@ declare(strict_types=1);
 
 use CadGestor\Http\Controllers\AlertaController;
 use CadGestor\Http\Controllers\ApiCatracaController;
+use CadGestor\Http\Controllers\AuditoriaController;
 use CadGestor\Http\Controllers\AutenticacaoController;
 use CadGestor\Http\Controllers\CatracaController;
 use CadGestor\Http\Controllers\EmpresaController;
@@ -20,6 +21,7 @@ use CadGestor\Http\Controllers\PainelController;
 use CadGestor\Http\Controllers\PerfilController;
 use CadGestor\Http\Controllers\PessoaController;
 use CadGestor\Http\Controllers\RegraAcessoController;
+use CadGestor\Http\Controllers\RelatorioController;
 use CadGestor\Http\Controllers\SaudeController;
 use CadGestor\Http\Controllers\SimuladorController;
 use CadGestor\Http\Controllers\UsuarioController;
@@ -136,6 +138,12 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
                 );
             });
 
+            // --- Relatórios (consulta) --------------------------------------
+            $rotas->grupo([$papel(Papel::Consulta)], static function (Roteador $rotas) use ($acao): void {
+                $rotas->get('/relatorios', $acao(RelatorioController::class, 'index'));
+                $rotas->get('/relatorios/exportar', $acao(RelatorioController::class, 'exportar'));
+            });
+
             // --- Administração ---------------------------------------------
             $rotas->grupo([$papel(Papel::Administrador)], static function (Roteador $rotas) use ($acao, $app): void {
                 $rotas->get('/usuarios', $acao(UsuarioController::class, 'index'));
@@ -152,6 +160,8 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
                 $rotas->post('/perfis/{id}', $acao(PerfilController::class, 'atualizar'));
 
                 $rotas->get('/termos', $acao(LgpdController::class, 'termos'));
+                $rotas->get('/auditoria', $acao(AuditoriaController::class, 'index'));
+                $rotas->get('/auditoria/exportar', $acao(AuditoriaController::class, 'exportar'));
                 $rotas->post('/termos', $acao(LgpdController::class, 'publicarTermo'));
 
                 // Diagnóstico técnico: só fora de produção.

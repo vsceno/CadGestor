@@ -8,6 +8,7 @@ declare(strict_types=1);
 
 use CadGestor\Http\Controllers\AlertaController;
 use CadGestor\Http\Controllers\ApiCatracaController;
+use CadGestor\Http\Controllers\AuditoriaController;
 use CadGestor\Http\Controllers\AutenticacaoController;
 use CadGestor\Http\Controllers\CatracaController;
 use CadGestor\Http\Controllers\EmpresaController;
@@ -17,6 +18,7 @@ use CadGestor\Http\Controllers\PainelController;
 use CadGestor\Http\Controllers\PerfilController;
 use CadGestor\Http\Controllers\PessoaController;
 use CadGestor\Http\Controllers\RegraAcessoController;
+use CadGestor\Http\Controllers\RelatorioController;
 use CadGestor\Http\Controllers\SaudeController;
 use CadGestor\Http\Controllers\SimuladorController;
 use CadGestor\Http\Controllers\UsuarioController;
@@ -30,6 +32,7 @@ use CadGestor\Repositorios\LgpdRepositorio;
 use CadGestor\Repositorios\PerfilRepositorio;
 use CadGestor\Repositorios\PessoaRepositorio;
 use CadGestor\Repositorios\RegraAcessoRepositorio;
+use CadGestor\Repositorios\RelatorioRepositorio;
 use CadGestor\Repositorios\UsuarioRepositorio;
 use CadGestor\Repositorios\VinculoRepositorio;
 use CadGestor\Acesso\AcessoServico;
@@ -280,5 +283,19 @@ return static function (Container $c, Aplicacao $app): void {
         $c->obter(CatracaRepositorio::class),
         $c->obter(EventoRepositorio::class),
         $c->obter(AcessoServico::class),
+    ));
+    $c->registrar(RelatorioRepositorio::class, static fn (): RelatorioRepositorio => new RelatorioRepositorio(
+        $pdo(),
+        $ambiente->texto('APP_FUSO'),
+    ));
+    $c->registrar(RelatorioController::class, static fn (Container $c): RelatorioController => new RelatorioController(
+        $c->obter(Sessao::class),
+        $c->obter(RelatorioRepositorio::class),
+        $c->obter(Auditoria::class),
+    ));
+    $c->registrar(AuditoriaController::class, static fn (Container $c): AuditoriaController => new AuditoriaController(
+        $c->obter(Sessao::class),
+        $c->obter(RelatorioRepositorio::class),
+        $c->obter(Auditoria::class),
     ));
 };
