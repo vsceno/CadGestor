@@ -19,7 +19,11 @@ final class Resposta
 
     public static function html(string $corpo, int $status = 200): self
     {
-        return new self($corpo, $status, ['Content-Type' => 'text/html; charset=UTF-8']);
+        return new self($corpo, $status, [
+            'Content-Type' => 'text/html; charset=UTF-8',
+            // Páginas internas podem conter dados pessoais: nunca guardar em cache.
+            'Cache-Control' => 'no-store',
+        ]);
     }
 
     /** @param array<mixed> $dados */
@@ -38,6 +42,26 @@ final class Resposta
         return new self('', $status, ['Location' => $destino]);
     }
 
+    /** Arquivo para download (ex.: CSV). */
+    public static function download(string $conteudo, string $nomeArquivo, string $tipo): self
+    {
+        $nomeSeguro = preg_replace('/[^A-Za-z0-9._-]/', '_', $nomeArquivo) ?? 'arquivo';
+
+        return new self($conteudo, 200, [
+            'Content-Type' => $tipo,
+            'Content-Disposition' => 'attachment; filename="' . $nomeSeguro . '"',
+            'Cache-Control' => 'no-store',
+        ]);
+    }
+
+    public function comCabecalho(string $nome, string $valor): self
+    {
+        $nova = clone $this;
+        $nova->cabecalhos[$nome] = $valor;
+
+        return $nova;
+    }
+
     /** @return array<string, string> */
     public function cabecalhos(): array
     {
@@ -49,7 +73,7 @@ final class Resposta
         if (!headers_sent()) {
             http_response_code($this->status);
 
-            foreach ($this->cabecalhosSeguranca() + $this->cabecalhos as $nome => $valor) {
+            foreach ($this->cabecalhos + $this->cabecalhosSeguranca() as $nome => $valor) {
                 header("{$nome}: {$valor}");
             }
         }
@@ -68,8 +92,9 @@ final class Resposta
             'X-Content-Type-Options' => 'nosniff',
             'X-Frame-Options' => 'DENY',
             'Referrer-Policy' => 'same-origin',
-            'Content-Security-Policy' => "default-src 'self'; img-src 'self' data:; "
+            'Content-Security-Policy' => "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; "
                 . "object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'",
+            'Permissions-Policy' => 'camera=(self), microphone=(), geolocation=()',
         ];
     }
 }

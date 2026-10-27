@@ -24,6 +24,7 @@ try {
     exit;
 }
 
-$app->registrarRotas($raiz . '/config/rotas.php')
+$app->registrarServicos($raiz . '/config/servicos.php')
+    ->registrarRotas($raiz . '/config/rotas.php')
     ->atender(Requisicao::daGlobal())
     ->enviar();

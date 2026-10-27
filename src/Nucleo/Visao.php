@@ -16,16 +16,46 @@ final class Visao
 {
     private static string $diretorio = __DIR__ . '/../../views';
 
+    /** @var array<string, mixed> dados disponíveis em todas as views (usuário, token CSRF...) */
+    private static array $compartilhado = [];
+
+    /** @param array<string, mixed> $dados */
+    public static function compartilhar(array $dados): void
+    {
+        self::$compartilhado = $dados + self::$compartilhado;
+    }
+
+    public static function compartilhado(string $chave, mixed $padrao = null): mixed
+    {
+        return self::$compartilhado[$chave] ?? $padrao;
+    }
+
+    public static function limparCompartilhado(): void
+    {
+        self::$compartilhado = [];
+    }
+
     /** @param array<string, mixed> $dados */
     public static function renderizar(string $template, array $dados = [], ?string $layout = 'layout/base'): string
     {
+        $dados += self::$compartilhado;
         $conteudo = self::incluir($template, $dados);
 
         if ($layout === null) {
             return $conteudo;
         }
 
-        return self::incluir($layout, $dados + ['conteudo' => $conteudo]);
+        return self::incluir($layout, ['conteudo' => $conteudo] + $dados);
+    }
+
+    /**
+     * Renderiza um trecho reutilizável (views/parciais/...) sem layout.
+     *
+     * @param array<string, mixed> $dados
+     */
+    public static function parcial(string $template, array $dados = []): string
+    {
+        return self::incluir('parciais/' . $template, $dados + self::$compartilhado);
     }
 
     /** @param array<string, mixed> $dados */

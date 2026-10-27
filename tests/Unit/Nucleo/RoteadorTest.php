@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace CadGestor\Testes\Unit\Nucleo;
 
+use CadGestor\Http\Middleware\Middleware;
 use CadGestor\Nucleo\Requisicao;
 use CadGestor\Nucleo\Resposta;
 use CadGestor\Nucleo\Roteador;
@@ -65,6 +66,73 @@ final class RoteadorTest extends TestCase
 
         self::assertSame(405, $resposta->status);
         self::assertSame('GET', $resposta->cabecalhos()['Allow']);
+    }
+
+    public function testMiddlewaresDeGrupoERotaExecutamEmOrdem(): void
+    {
+        $ordem = [];
+        $registrar = static function (string $nome) use (&$ordem): Middleware {
+            return new class ($nome, $ordem) implements Middleware {
+            /** @param list<string> $ordem */
+                public function __construct(private string $nome, private array &$ordem)
+                {
+                }
+
+                public function processar(Requisicao $requisicao, callable $proximo): Resposta
+                {
+                    $this->ordem[] = $this->nome;
+
+                    return $proximo($requisicao);
+                }
+            };
+        };
+
+        $roteador = new Roteador();
+        $roteador->grupo([$registrar('grupo')], static function (Roteador $r) use ($registrar, &$ordem): void {
+            $r->get('/x', static function () use (&$ordem): Resposta {
+                $ordem[] = 'controller';
+
+                return new Resposta('ok');
+            }, [$registrar('rota')]);
+        });
+
+        $roteador->despachar(new Requisicao('GET', '/x'));
+
+        self::assertSame(['grupo', 'rota', 'controller'], $ordem);
+    }
+
+    public function testMiddlewarePodeBarrarAntesDoController(): void
+    {
+        $bloqueio = new class implements Middleware {
+            public function processar(Requisicao $requisicao, callable $proximo): Resposta
+            {
+                return new Resposta('barrado', 403);
+            }
+        };
+
+        $roteador = new Roteador();
+        $roteador->get('/admin', static fn (): Resposta => new Resposta('segredo'), [$bloqueio]);
+
+        $resposta = $roteador->despachar(new Requisicao('GET', '/admin'));
+
+        self::assertSame(403, $resposta->status);
+        self::assertSame('barrado', $resposta->corpo);
+    }
+
+    public function testMiddlewaresDeGrupoNaoVazamParaRotasForaDoGrupo(): void
+    {
+        $bloqueio = new class implements Middleware {
+            public function processar(Requisicao $requisicao, callable $proximo): Resposta
+            {
+                return new Resposta('barrado', 403);
+            }
+        };
+
+        $roteador = new Roteador();
+        $roteador->grupo([$bloqueio], static fn (Roteador $r) => $r->get('/dentro', static fn () => new Resposta('x')));
+        $roteador->get('/fora', static fn (): Resposta => new Resposta('livre'));
+
+        self::assertSame('livre', $roteador->despachar(new Requisicao('GET', '/fora'))->corpo);
     }
 
     public function testNormalizaBarraFinal(): void

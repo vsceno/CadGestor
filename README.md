@@ -164,7 +164,8 @@ php bin/criar-admin.php --nome="Nome Completo" --email=admin@empresa.com.br
 
 | Endereço | Esperado |
 |---|---|
-| http://cadgestor.test/ | Diagnóstico com todos os itens "OK": ambiente, migrações, perfis, administrador e lista de tabelas (só fora de produção) |
+| http://cadgestor.test/ | Tela de login |
+| http://cadgestor.test/diagnostico | (administrador, fora de produção) Diagnóstico de ambiente, migrações, perfis e tabelas |
 | http://cadgestor.test/saude | `{"status":"ok","banco":"conectado","schema":"cadgestor"}` |
 | http://cadgestor.test/qualquer-coisa | Página 404 |
 
@@ -200,6 +201,8 @@ ele for igual ao `DB_BANCO` do `.env`. Sem o banco de teste, esses testes são p
 | `DB_BANCO`, `DB_SCHEMA` | 0 | Banco e schema (`cadgestor`) |
 | `DB_USUARIO`, `DB_SENHA` | 0 | Papel da aplicação (`cadgestor_app`) |
 | `DB_MIGRACAO_USUARIO`, `DB_MIGRACAO_SENHA` | 1 | Papel de migração (`cadgestor_owner`) |
+| `APP_SEGREDO` | 2 | Segredo (64 hex) para HMAC de identificadores técnicos |
+| `SESSAO_INATIVIDADE_MINUTOS` | 2 | Minutos sem uso até a sessão expirar (padrão 30) |
 | `SESSAO_SEGURA` | 2 | Cookie de sessão só por HTTPS (`true` em produção) |
 | `CHAVE_CIFRA_ARQUIVO` | 6 | Caminho da chave de cifra dos templates biométricos (fora de `public/`) |
 | `RETENCAO_DIAS` | 9 | Dias após o fim do vínculo para excluir biometria e dados. **Provisório: validar com o jurídico** |
@@ -211,6 +214,30 @@ ele for igual ao `DB_BANCO` do `.env`. Sem o banco de teste, esses testes são p
 - **Erros:** o log registra só a classe do erro, o arquivo, a linha e um código de referência, **nunca a mensagem**, porque mensagens de banco podem conter CPF e outros valores. O usuário vê só o código de referência.
 - **URLs:** parâmetros de rota aceitam apenas UUID, então CPF ou nome nunca aparecem no endereço.
 - **Cabeçalhos de segurança:** toda resposta inclui CSP, `X-Frame-Options: DENY`, `nosniff` e `Referrer-Policy`.
+
+### Autenticação e permissões (Fase 2)
+
+| Papel | Acesso |
+|---|---|
+| `administrador` | Tudo, incluindo usuários, perfis, termos LGPD, auditoria e diagnóstico |
+| `cadastro_empresa` | Empresas, horários, catracas e regras de acesso por perfil |
+| `cadastro_pessoa` | Pessoas, vínculos, consentimento e biometria |
+| `consulta` | Relatórios, exportação CSV e alertas (somente leitura) |
+
+Um usuário pode ter vários papéis. Os papéis são verificados **em cada rota**
+pelos middlewares, e o menu só mostra o que o usuário pode acessar.
+
+- **Senhas:** Argon2id, com mínimo de 12 caracteres, recusa de senhas comuns e
+  troca obrigatória no primeiro acesso. Hashes antigos são refeitos no login.
+- **Força bruta:** após 5 falhas por e-mail ou 20 por IP em 15 minutos, o login é
+  bloqueado. O e-mail fica gravado como HMAC (`APP_SEGREDO`), nunca em texto. A
+  resposta é a mesma para e-mail inexistente e senha errada, inclusive no tempo.
+- **Sessão:** o cookie `cadgestor_sessao` usa `HttpOnly` e `SameSite=Strict`, e
+  `Secure` quando `SESSAO_SEGURA=true`. O ID muda no login e na troca de senha. A
+  sessão expira por inatividade (`SESSAO_INATIVIDADE_MINUTOS`) e após 12 horas.
+  Usuário desativado perde o acesso na hora.
+- **CSRF:** todo POST exige token; sem ele, a resposta é 403.
+- **Auditoria:** login, falha de login, logout, troca de senha e cadastro de usuários.
 
 ### Modelo de dados (Fase 1)
 
@@ -257,7 +284,7 @@ ele for igual ao `DB_BANCO` do `.env`. Sem o banco de teste, esses testes são p
 
 - [x] Fase 0: estrutura, Composer, .env, conexão PDO, README
 - [x] Fase 1: migrações e seeds
-- [ ] Fase 2: autenticação, papéis, CSRF, sessão
+- [x] Fase 2: autenticação, papéis, CSRF, sessão
 - [ ] Fase 3: empresas
 - [ ] Fase 4: perfis e catracas
 - [ ] Fase 5: pessoas, vínculos e regras de acesso

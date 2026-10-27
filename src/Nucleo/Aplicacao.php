@@ -8,15 +8,15 @@ use Throwable;
 
 /**
  * Ponto de montagem da aplicação: carrega o .env, configura fuso e erros,
- * cria a conexão com o banco e registra as rotas.
- *
- * Usado tanto pelo public/index.php quanto pelos scripts de bin/.
+ * cria a conexão com o banco, os serviços e as rotas.
  */
 final class Aplicacao
 {
     public readonly Roteador $roteador;
     public readonly ConexaoBanco $banco;
     public readonly Log $log;
+    public readonly Container $container;
+    public readonly Contexto $contexto;
     private readonly TratadorErros $tratadorErros;
 
     private function __construct(
@@ -35,6 +35,8 @@ final class Aplicacao
 
         $this->banco = ConexaoBanco::doAmbiente($ambiente);
         $this->roteador = new Roteador();
+        $this->container = new Container();
+        $this->contexto = new Contexto();
     }
 
     public static function iniciar(string $raiz): self
@@ -42,21 +44,31 @@ final class Aplicacao
         return new self($raiz, Ambiente::carregar($raiz));
     }
 
+    public function registrarServicos(string $arquivo): self
+    {
+        $registrar = require $arquivo;
+        $registrar($this->container, $this);
+
+        return $this;
+    }
+
     public function registrarRotas(string $arquivo): self
     {
         $registrar = require $arquivo;
-        $registrar($this->roteador, $this);
+        $registrar($this->roteador, $this->container, $this);
 
         return $this;
     }
 
     public function atender(Requisicao $requisicao): Resposta
     {
+        $this->contexto->ip = $requisicao->ip();
+        $api = str_starts_with($requisicao->caminho, '/api/') || $requisicao->caminho === '/saude';
+
         try {
             return $this->roteador->despachar($requisicao);
         } catch (Throwable $erro) {
-            return $this->tratadorErros->tratar($erro, str_starts_with($requisicao->caminho, '/api/')
-                || $requisicao->caminho === '/saude');
+            return $this->tratadorErros->tratar($erro, $api);
         }
     }
 }
