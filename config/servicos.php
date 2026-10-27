@@ -7,12 +7,20 @@
 declare(strict_types=1);
 
 use CadGestor\Http\Controllers\AutenticacaoController;
+use CadGestor\Http\Controllers\CatracaController;
+use CadGestor\Http\Controllers\EmpresaController;
 use CadGestor\Http\Controllers\InicioController;
 use CadGestor\Http\Controllers\PainelController;
+use CadGestor\Http\Controllers\PerfilController;
+use CadGestor\Http\Controllers\RegraAcessoController;
 use CadGestor\Http\Controllers\SaudeController;
 use CadGestor\Http\Controllers\UsuarioController;
 use CadGestor\Nucleo\Aplicacao;
 use CadGestor\Nucleo\Container;
+use CadGestor\Repositorios\CatracaRepositorio;
+use CadGestor\Repositorios\EmpresaRepositorio;
+use CadGestor\Repositorios\PerfilRepositorio;
+use CadGestor\Repositorios\RegraAcessoRepositorio;
 use CadGestor\Repositorios\UsuarioRepositorio;
 use CadGestor\Seguranca\Autenticacao;
 use CadGestor\Seguranca\Csrf;
@@ -20,6 +28,10 @@ use CadGestor\Seguranca\HashSenha;
 use CadGestor\Seguranca\LimitadorTentativas;
 use CadGestor\Seguranca\Sessao;
 use CadGestor\Servicos\Auditoria;
+use CadGestor\Servicos\CatracaServico;
+use CadGestor\Servicos\EmpresaServico;
+use CadGestor\Servicos\PerfilServico;
+use CadGestor\Servicos\RegraAcessoServico;
 use CadGestor\Servicos\UsuarioServico;
 
 return static function (Container $c, Aplicacao $app): void {
@@ -48,8 +60,41 @@ return static function (Container $c, Aplicacao $app): void {
         $app->contexto,
     ));
 
-    // --- Repositórios e serviços ------------------------------------------
-    $c->registrar(UsuarioRepositorio::class, static fn (): UsuarioRepositorio => new UsuarioRepositorio($pdo()));
+    // --- Repositórios (todos recebem apenas o PDO) -------------------------
+    foreach (
+        [
+            UsuarioRepositorio::class, EmpresaRepositorio::class, PerfilRepositorio::class,
+            CatracaRepositorio::class, RegraAcessoRepositorio::class,
+        ] as $repositorio
+    ) {
+        $c->registrar($repositorio, static fn (): object => new $repositorio($pdo()));
+    }
+
+    // --- Serviços -----------------------------------------------------------
+    $c->registrar(EmpresaServico::class, static fn (Container $c): EmpresaServico => new EmpresaServico(
+        $pdo(),
+        $c->obter(EmpresaRepositorio::class),
+        $c->obter(PerfilRepositorio::class),
+        $c->obter(Auditoria::class),
+    ));
+    $c->registrar(PerfilServico::class, static fn (Container $c): PerfilServico => new PerfilServico(
+        $pdo(),
+        $c->obter(PerfilRepositorio::class),
+        $c->obter(Auditoria::class),
+    ));
+    $c->registrar(CatracaServico::class, static fn (Container $c): CatracaServico => new CatracaServico(
+        $pdo(),
+        $c->obter(CatracaRepositorio::class),
+        $c->obter(EmpresaRepositorio::class),
+        $c->obter(Auditoria::class),
+    ));
+    $c->registrar(RegraAcessoServico::class, static fn (Container $c): RegraAcessoServico => new RegraAcessoServico(
+        $pdo(),
+        $c->obter(RegraAcessoRepositorio::class),
+        $c->obter(EmpresaRepositorio::class),
+        $c->obter(CatracaRepositorio::class),
+        $c->obter(Auditoria::class),
+    ));
     $c->registrar(UsuarioServico::class, static fn (Container $c): UsuarioServico => new UsuarioServico(
         $pdo(),
         $c->obter(UsuarioRepositorio::class),
@@ -81,4 +126,31 @@ return static function (Container $c, Aplicacao $app): void {
         $c->obter(UsuarioServico::class),
         $c->obter(Autenticacao::class),
     ));
+    $c->registrar(EmpresaController::class, static fn (Container $c): EmpresaController => new EmpresaController(
+        $c->obter(Sessao::class),
+        $c->obter(EmpresaRepositorio::class),
+        $c->obter(PerfilRepositorio::class),
+        $c->obter(CatracaRepositorio::class),
+        $c->obter(RegraAcessoRepositorio::class),
+        $c->obter(EmpresaServico::class),
+    ));
+    $c->registrar(PerfilController::class, static fn (Container $c): PerfilController => new PerfilController(
+        $c->obter(Sessao::class),
+        $c->obter(PerfilRepositorio::class),
+        $c->obter(PerfilServico::class),
+    ));
+    $c->registrar(CatracaController::class, static fn (Container $c): CatracaController => new CatracaController(
+        $c->obter(Sessao::class),
+        $c->obter(CatracaRepositorio::class),
+        $c->obter(EmpresaRepositorio::class),
+        $c->obter(CatracaServico::class),
+    ));
+    $c->registrar(RegraAcessoController::class, static fn (Container $c): RegraAcessoController =>
+        new RegraAcessoController(
+            $c->obter(Sessao::class),
+            $c->obter(EmpresaRepositorio::class),
+            $c->obter(CatracaRepositorio::class),
+            $c->obter(RegraAcessoRepositorio::class),
+            $c->obter(RegraAcessoServico::class),
+        ));
 };

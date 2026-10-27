@@ -45,6 +45,11 @@ h2 {
     margin: 1.75rem 0 0.5rem;
 }
 
+.cartao > h2:first-child,
+.cabecalho-pagina h2 {
+    margin-top: 0;
+}
+
 hr {
     border: 0;
     border-top: 1px solid var(--cor-borda);

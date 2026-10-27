@@ -239,6 +239,37 @@ pelos middlewares, e o menu só mostra o que o usuário pode acessar.
 - **CSRF:** todo POST exige token; sem ele, a resposta é 403.
 - **Auditoria:** login, falha de login, logout, troca de senha e cadastro de usuários.
 
+### Empresas, perfis, catracas e regras (Fases 3 e 4)
+
+- **Empresas:** cadastro com validação de CNPJ (numérico e alfanumérico), CEP, UF,
+  e-mail e telefone do responsável legal. Empresas são inativadas, nunca apagadas.
+  Em cada empresa se configuram os **perfis aceitos** e o **horário padrão**.
+- **Perfis** (somente administrador): novos perfis entram pela tela, sem mudar
+  código. Cada perfil registra a base legal e se ela já foi **validada pelo jurídico**.
+- **Catracas:** ao cadastrar, o sistema gera um token (`cgt_` + 64 caracteres
+  hexadecimais) exibido **uma única vez**; o banco guarda só o SHA-256. Ao gerar
+  um novo token, o anterior para de funcionar na hora.
+- **Regras de acesso:** uma matriz perfil × catraca × dia × faixa de horário, como
+  lista de permissões (fim exclusivo; `00:00` no fim = meia-noite). Faixas sobrepostas
+  na mesma catraca são recusadas.
+
+#### Modo de falha e funcionamento offline (requisito)
+
+| Modo | Sem resposta do servidor | Indicado para |
+|---|---|---|
+| `bloquear` (padrão) | A catraca mantém o bloqueio | Áreas restritas |
+| `liberar` | A catraca libera a passagem | Fluxos onde travar causa risco |
+
+- A API devolve o `modo_falha` de cada catraca (`GET /api/v1/configuracao`), para que o
+  dispositivo saiba como agir sem conexão.
+- **Offline:** o dispositivo deve guardar os eventos localmente e reenviá-los com
+  `data_hora` original e `offline: true`. Eles são gravados como eventos offline.
+  A decisão offline depende do recurso do fabricante (lista local de templates) e fica
+  para quando o modelo da catraca for definido.
+- **Emergência/incêndio:** a liberação das rotas de fuga **não deve depender do
+  software**. O correto é intertravamento por hardware com o alarme (destravamento
+  físico, conforme normas do Corpo de Bombeiros). O sistema apenas registra.
+
 ### Modelo de dados (Fase 1)
 
 | Grupo | Tabelas |
@@ -285,8 +316,8 @@ pelos middlewares, e o menu só mostra o que o usuário pode acessar.
 - [x] Fase 0: estrutura, Composer, .env, conexão PDO, README
 - [x] Fase 1: migrações e seeds
 - [x] Fase 2: autenticação, papéis, CSRF, sessão
-- [ ] Fase 3: empresas
-- [ ] Fase 4: perfis e catracas
+- [x] Fase 3: empresas
+- [x] Fase 4: perfis e catracas
 - [ ] Fase 5: pessoas, vínculos e regras de acesso
 - [ ] Fase 6: consentimento LGPD e biometria cifrada
 - [ ] Fase 7: API da catraca e motor de decisão

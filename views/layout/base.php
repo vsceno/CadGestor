@@ -18,6 +18,9 @@ $mensagens = isset($consumir_flash) ? $consumir_flash() : [];
 // Itens do menu: [rótulo, caminho, papéis que enxergam (vazio = todos)]
 $menu = [
     ['Painel', '/painel', []],
+    ['Empresas', '/empresas', [Papel::CadastroEmpresa]],
+    ['Catracas', '/catracas', [Papel::CadastroEmpresa]],
+    ['Perfis', '/perfis', [Papel::Administrador]],
     ['Usuários', '/usuarios', [Papel::Administrador]],
 ];
 

@@ -10,8 +10,12 @@
 declare(strict_types=1);
 
 use CadGestor\Http\Controllers\AutenticacaoController;
+use CadGestor\Http\Controllers\CatracaController;
+use CadGestor\Http\Controllers\EmpresaController;
 use CadGestor\Http\Controllers\InicioController;
 use CadGestor\Http\Controllers\PainelController;
+use CadGestor\Http\Controllers\PerfilController;
+use CadGestor\Http\Controllers\RegraAcessoController;
 use CadGestor\Http\Controllers\SaudeController;
 use CadGestor\Http\Controllers\UsuarioController;
 use CadGestor\Http\Middleware\ExigeAutenticacao;
@@ -59,6 +63,29 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
             $rotas->post('/senha', $acao(AutenticacaoController::class, 'trocarSenha'));
             $rotas->get('/painel', $acao(PainelController::class, 'index'));
 
+            // --- Empresas, catracas e regras (cadastro_empresa) -----------
+            $rotas->grupo([$papel(Papel::CadastroEmpresa)], static function (Roteador $rotas) use ($acao): void {
+                $rotas->get('/empresas', $acao(EmpresaController::class, 'index'));
+                $rotas->get('/empresas/nova', $acao(EmpresaController::class, 'novo'));
+                $rotas->post('/empresas', $acao(EmpresaController::class, 'criar'));
+                $rotas->get('/empresas/{id}', $acao(EmpresaController::class, 'ver'));
+                $rotas->get('/empresas/{id}/editar', $acao(EmpresaController::class, 'editar'));
+                $rotas->post('/empresas/{id}', $acao(EmpresaController::class, 'atualizar'));
+                $rotas->post('/empresas/{id}/situacao', $acao(EmpresaController::class, 'alterarSituacao'));
+                $rotas->post('/empresas/{id}/perfis', $acao(EmpresaController::class, 'salvarPerfis'));
+                $rotas->post('/empresas/{id}/horarios', $acao(EmpresaController::class, 'salvarHorarios'));
+                $rotas->get('/empresas/{id}/regras', $acao(RegraAcessoController::class, 'index'));
+                $rotas->post('/empresas/{id}/regras/{perfil}', $acao(RegraAcessoController::class, 'salvarDoPerfil'));
+
+                $rotas->get('/catracas', $acao(CatracaController::class, 'index'));
+                $rotas->get('/catracas/nova', $acao(CatracaController::class, 'novo'));
+                $rotas->post('/catracas', $acao(CatracaController::class, 'criar'));
+                $rotas->get('/catracas/{id}/editar', $acao(CatracaController::class, 'editar'));
+                $rotas->post('/catracas/{id}', $acao(CatracaController::class, 'atualizar'));
+                $rotas->post('/catracas/{id}/token', $acao(CatracaController::class, 'renovarToken'));
+                $rotas->post('/catracas/{id}/situacao', $acao(CatracaController::class, 'alterarSituacao'));
+            });
+
             // --- Administração ---------------------------------------------
             $rotas->grupo([$papel(Papel::Administrador)], static function (Roteador $rotas) use ($acao, $app): void {
                 $rotas->get('/usuarios', $acao(UsuarioController::class, 'index'));
@@ -67,6 +94,12 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
                 $rotas->get('/usuarios/{id}/editar', $acao(UsuarioController::class, 'editar'));
                 $rotas->post('/usuarios/{id}', $acao(UsuarioController::class, 'atualizar'));
                 $rotas->post('/usuarios/{id}/senha', $acao(UsuarioController::class, 'redefinirSenha'));
+
+                $rotas->get('/perfis', $acao(PerfilController::class, 'index'));
+                $rotas->get('/perfis/novo', $acao(PerfilController::class, 'novo'));
+                $rotas->post('/perfis', $acao(PerfilController::class, 'criar'));
+                $rotas->get('/perfis/{id}/editar', $acao(PerfilController::class, 'editar'));
+                $rotas->post('/perfis/{id}', $acao(PerfilController::class, 'atualizar'));
 
                 // Diagnóstico técnico: só fora de produção.
                 if (!$app->ambiente->emProducao()) {
