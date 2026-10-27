@@ -13,6 +13,7 @@ use CadGestor\Http\Controllers\AutenticacaoController;
 use CadGestor\Http\Controllers\CatracaController;
 use CadGestor\Http\Controllers\EmpresaController;
 use CadGestor\Http\Controllers\InicioController;
+use CadGestor\Http\Controllers\LgpdController;
 use CadGestor\Http\Controllers\PainelController;
 use CadGestor\Http\Controllers\PerfilController;
 use CadGestor\Http\Controllers\PessoaController;
@@ -102,6 +103,18 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
                 $rotas->post('/vinculos/{id}', $acao(VinculoController::class, 'alterar'));
                 $rotas->get('/vinculos/{id}/regras', $acao(VinculoController::class, 'regras'));
                 $rotas->post('/vinculos/{id}/regras', $acao(VinculoController::class, 'salvarRegras'));
+
+                // LGPD: consentimento e biometria
+                $rotas->post('/pessoas/{id}/consentimento', $acao(LgpdController::class, 'registrarConsentimento'));
+                $rotas->post(
+                    '/pessoas/{id}/consentimento/revogar',
+                    $acao(LgpdController::class, 'revogarConsentimento'),
+                );
+                $rotas->post('/pessoas/{id}/biometrias', $acao(LgpdController::class, 'cadastrarBiometria'));
+                $rotas->post(
+                    '/pessoas/{id}/biometrias/{biometria}/excluir',
+                    $acao(LgpdController::class, 'excluirBiometria'),
+                );
             });
 
             // --- Administração ---------------------------------------------
@@ -118,6 +131,9 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
                 $rotas->post('/perfis', $acao(PerfilController::class, 'criar'));
                 $rotas->get('/perfis/{id}/editar', $acao(PerfilController::class, 'editar'));
                 $rotas->post('/perfis/{id}', $acao(PerfilController::class, 'atualizar'));
+
+                $rotas->get('/termos', $acao(LgpdController::class, 'termos'));
+                $rotas->post('/termos', $acao(LgpdController::class, 'publicarTermo'));
 
                 // Diagnóstico técnico: só fora de produção.
                 if (!$app->ambiente->emProducao()) {

@@ -102,7 +102,7 @@ abstract class BancoTestCase extends TestCase
         return (string) $consulta->fetchColumn();
     }
 
-    protected function criarTermo(string $versao = '1.0'): string
+    protected function criarTermo(string $versao = 'teste-1'): string
     {
         $texto = "Termo de consentimento de teste, versão {$versao}.";
 

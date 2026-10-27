@@ -10,6 +10,7 @@ use CadGestor\Http\Controllers\AutenticacaoController;
 use CadGestor\Http\Controllers\CatracaController;
 use CadGestor\Http\Controllers\EmpresaController;
 use CadGestor\Http\Controllers\InicioController;
+use CadGestor\Http\Controllers\LgpdController;
 use CadGestor\Http\Controllers\PainelController;
 use CadGestor\Http\Controllers\PerfilController;
 use CadGestor\Http\Controllers\PessoaController;
@@ -21,18 +22,24 @@ use CadGestor\Nucleo\Aplicacao;
 use CadGestor\Nucleo\Container;
 use CadGestor\Repositorios\CatracaRepositorio;
 use CadGestor\Repositorios\EmpresaRepositorio;
+use CadGestor\Repositorios\LgpdRepositorio;
 use CadGestor\Repositorios\PerfilRepositorio;
 use CadGestor\Repositorios\PessoaRepositorio;
 use CadGestor\Repositorios\RegraAcessoRepositorio;
 use CadGestor\Repositorios\UsuarioRepositorio;
 use CadGestor\Repositorios\VinculoRepositorio;
+use CadGestor\Biometria\IdentificadorBiometrico;
+use CadGestor\Biometria\IdentificadorSimulado;
 use CadGestor\Seguranca\Autenticacao;
+use CadGestor\Seguranca\CifradorBiometria;
 use CadGestor\Seguranca\Csrf;
 use CadGestor\Seguranca\HashSenha;
 use CadGestor\Seguranca\LimitadorTentativas;
 use CadGestor\Seguranca\Sessao;
 use CadGestor\Servicos\Auditoria;
+use CadGestor\Servicos\BiometriaServico;
 use CadGestor\Servicos\CatracaServico;
+use CadGestor\Servicos\ConsentimentoServico;
 use CadGestor\Servicos\EmpresaServico;
 use CadGestor\Servicos\PerfilServico;
 use CadGestor\Servicos\PessoaServico;
@@ -72,7 +79,7 @@ return static function (Container $c, Aplicacao $app): void {
         [
             UsuarioRepositorio::class, EmpresaRepositorio::class, PerfilRepositorio::class,
             CatracaRepositorio::class, RegraAcessoRepositorio::class, PessoaRepositorio::class,
-            VinculoRepositorio::class,
+            VinculoRepositorio::class, LgpdRepositorio::class,
         ] as $repositorio
     ) {
         $c->registrar($repositorio, static fn (): object => new $repositorio($pdo()));
@@ -120,6 +127,38 @@ return static function (Container $c, Aplicacao $app): void {
         $pdo(),
         $c->obter(VinculoRepositorio::class),
         $c->obter(PessoaRepositorio::class),
+        $c->obter(Auditoria::class),
+        $c->obter(SincronizacaoServico::class),
+    ));
+
+    // --- Biometria e LGPD ----------------------------------------------------
+    $c->registrar(IdentificadorBiometrico::class, static function () use ($ambiente): IdentificadorBiometrico {
+        // Ponto de extensão: adaptadores de fabricantes entram aqui (src/Biometria/Adaptadores).
+        return match ($ambiente->texto('IDENTIFICADOR_BIOMETRICO', 'simulado')) {
+            'simulado' => new IdentificadorSimulado(),
+            default => throw new RuntimeException('Adaptador biométrico desconhecido.'),
+        };
+    });
+    $c->registrar(CifradorBiometria::class, static function () use ($ambiente, $app): CifradorBiometria {
+        return CifradorBiometria::doArquivo(
+            CifradorBiometria::resolverCaminho($ambiente->texto('CHAVE_CIFRA_ARQUIVO'), $app->raiz),
+        );
+    });
+    $c->registrar(ConsentimentoServico::class, static fn (Container $c): ConsentimentoServico =>
+        new ConsentimentoServico(
+            $pdo(),
+            $c->obter(LgpdRepositorio::class),
+            $c->obter(PessoaRepositorio::class),
+            $c->obter(Auditoria::class),
+            $c->obter(SincronizacaoServico::class),
+            $app->contexto,
+        ));
+    $c->registrar(BiometriaServico::class, static fn (Container $c): BiometriaServico => new BiometriaServico(
+        $pdo(),
+        $c->obter(LgpdRepositorio::class),
+        $c->obter(PessoaRepositorio::class),
+        $c->obter(IdentificadorBiometrico::class),
+        $c->obter(CifradorBiometria::class),
         $c->obter(Auditoria::class),
         $c->obter(SincronizacaoServico::class),
     ));
@@ -180,6 +219,7 @@ return static function (Container $c, Aplicacao $app): void {
         $c->obter(PessoaRepositorio::class),
         $c->obter(VinculoRepositorio::class),
         $c->obter(PessoaServico::class),
+        static fn (string $pessoaId): array => $c->obter(LgpdController::class)->painel($pessoaId),
     ));
     $c->registrar(VinculoController::class, static fn (Container $c): VinculoController => new VinculoController(
         $c->obter(Sessao::class),
@@ -188,5 +228,12 @@ return static function (Container $c, Aplicacao $app): void {
         $c->obter(RegraAcessoRepositorio::class),
         $c->obter(RegraAcessoServico::class),
         $c->obter(CatracaRepositorio::class),
+    ));
+    $c->registrar(LgpdController::class, static fn (Container $c): LgpdController => new LgpdController(
+        $c->obter(Sessao::class),
+        $c->obter(LgpdRepositorio::class),
+        $c->obter(ConsentimentoServico::class),
+        $c->obter(BiometriaServico::class),
+        $c->obter(IdentificadorBiometrico::class),
     ));
 };

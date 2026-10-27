@@ -22,6 +22,7 @@ $menu = [
     ['Catracas', '/catracas', [Papel::CadastroEmpresa]],
     ['Pessoas', '/pessoas', [Papel::CadastroPessoa]],
     ['Perfis', '/perfis', [Papel::Administrador]],
+    ['Termos LGPD', '/termos', [Papel::Administrador]],
     ['Usuários', '/usuarios', [Papel::Administrador]],
 ];
 

@@ -205,6 +205,8 @@ ele for igual ao `DB_BANCO` do `.env`. Sem o banco de teste, esses testes sÃ£o
 | `SESSAO_INATIVIDADE_MINUTOS` | 2 | Minutos sem uso atÃ© a sessÃ£o expirar (padrÃ£o 30) |
 | `SESSAO_SEGURA` | 2 | Cookie de sessÃ£o sÃ³ por HTTPS (`true` em produÃ§Ã£o) |
 | `CHAVE_CIFRA_ARQUIVO` | 6 | Caminho da chave de cifra dos templates biomÃ©tricos (fora de `public/`) |
+| `IDENTIFICADOR_BIOMETRICO` | 6 | Adaptador do hardware: `simulado` ou o do fabricante |
+| `LIMIAR_CONFIANCA` | 7 | Confiança mínima (0 a 1) para aceitar a identificação (padrão 0.80) |
 | `RETENCAO_DIAS` | 9 | Dias apÃ³s o fim do vÃ­nculo para excluir biometria e dados. **ProvisÃ³rio: validar com o jurÃ­dico** |
 
 ## DecisÃµes tÃ©cnicas
@@ -288,6 +290,43 @@ pelos middlewares, e o menu sÃ³ mostra o que o usuÃ¡rio pode acessar.
   as catracas da empresa. Ao encerrar o Ãºltimo vÃ­nculo com uma empresa, entra na fila a
   **remoÃ§Ã£o** da pessoa das catracas dela.
 
+### LGPD: consentimento e biometria (Fase 6)
+
+```powershell
+php bin/gerar-chave.php                # cria storage/chaves/biometria.key (uma vez)
+php bin/gerar-chave.php --rotacionar   # nova versão de chave (as antigas continuam decifrando)
+```
+
+> **Faça backup do arquivo de chave em local seguro e separado do backup do banco.**
+> Sem ele, os templates cifrados não podem ser recuperados. No Windows, restrinja o
+> acesso com `icacls storage\chaves\biometria.key /inheritance:r /grant:r "%USERNAME%:R"`
+> e conceda leitura ao usuário do serviço do Apache.
+
+- **Consentimento antes de tudo:** a coleta fica bloqueada até haver consentimento ativo.
+  A trava existe na aplicação **e** no banco (trigger `biometria_exige_consentimento`).
+- **O que fica registrado:** versão e hash SHA-256 do termo, data e hora, IP da estação,
+  canal e o operador. Os termos são versionados e **imutáveis**; uma nova versão é
+  publicada em *Termos LGPD*. O termo `1.0` é um **modelo** e precisa de revisão jurídica.
+- **Menores de 18 anos:** o consentimento exige nome, CPF e parentesco do responsável
+  legal. **Sem data de nascimento, a coleta é bloqueada** (idade não verificável).
+- **Cifra:** XChaCha20-Poly1305 (libsodium), com subchaves derivadas por KDF, nonce
+  aleatório de 24 bytes e AAD que amarra o template à pessoa, ao tipo e ao dedo.
+  O `hash_integridade` é um BLAKE2b com chave. Nenhuma tela mostra template.
+- **Foto facial (decisão documentada):** a foto (webcam ou arquivo JPEG/PNG/WebP de
+  até 5 MB, tipo conferido pelo conteúdo) é usada **só em memória** para gerar o
+  template e é descartada. O arquivo temporário é apagado e a variável é zerada com
+  `sodium_memzero`. **A tabela `foto_facial` não existe.** Ela só será criada se o
+  fabricante exigir a foto no dispositivo.
+- **Digital:** imagem bruta nunca é recebida nem gravada. No modo simulado, a
+  "leitura" é gerada no servidor e sinalizada na tela.
+- **Revogação:** apaga **de fato** todas as biometrias (template, nonce e hash viram
+  NULL), cancela envios pendentes e agenda `remover` em **todas** as catracas das
+  empresas da pessoa, tudo registrado na auditoria.
+- **Integração com hardware:** contrato `Biometria\IdentificadorBiometrico`
+  (extrair template, cadastrar, remover, identificar), com a implementação
+  `IdentificadorSimulado`. Adaptadores de fabricantes entram em
+  `src/Biometria/Adaptadores` (veja o LEIA-ME); **nenhum SDK foi suposto**.
+
 ### Modelo de dados (Fase 1)
 
 | Grupo | Tabelas |
@@ -337,7 +376,7 @@ pelos middlewares, e o menu sÃ³ mostra o que o usuÃ¡rio pode acessar.
 - [x] Fase 3: empresas
 - [x] Fase 4: perfis e catracas
 - [x] Fase 5: pessoas, vÃ­nculos e regras de acesso
-- [ ] Fase 6: consentimento LGPD e biometria cifrada
+- [x] Fase 6: consentimento LGPD e biometria cifrada
 - [ ] Fase 7: API da catraca e motor de decisÃ£o
 - [ ] Fase 8: relatÃ³rios, CSV e auditoria
 - [ ] Fase 9: jobs de manutenÃ§Ã£o, testes e revisÃ£o de seguranÃ§a
