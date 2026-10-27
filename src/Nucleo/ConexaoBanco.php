@@ -42,6 +42,21 @@ final class ConexaoBanco
         );
     }
 
+    /**
+     * Conexão com o papel dono do schema, usada só por migrações, seeds e jobs.
+     */
+    public static function paraMigracao(Ambiente $ambiente): self
+    {
+        return new self(
+            $ambiente->texto('DB_HOST'),
+            $ambiente->inteiro('DB_PORTA'),
+            $ambiente->texto('DB_BANCO'),
+            $ambiente->texto('DB_MIGRACAO_USUARIO'),
+            $ambiente->texto('DB_MIGRACAO_SENHA', ''),
+            $ambiente->texto('DB_SCHEMA'),
+        );
+    }
+
     public function pdo(): PDO
     {
         if ($this->pdo === null) {

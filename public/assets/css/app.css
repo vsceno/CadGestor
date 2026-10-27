@@ -88,6 +88,20 @@ a {
     text-transform: uppercase;
 }
 
+.cartao h2 {
+    font-size: 1.05rem;
+    margin: 1.75rem 0 0;
+}
+
+.tabela .numero {
+    text-align: right;
+}
+
+.tabela-compacta td,
+.tabela-compacta th {
+    padding: 0.3rem 0.5rem;
+}
+
 .selo {
     display: inline-block;
     padding: 0.1rem 0.5rem;

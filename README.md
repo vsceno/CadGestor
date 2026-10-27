@@ -27,7 +27,7 @@ repositories com PDO e views em PHP puro).
 ## Estrutura de pastas
 
 ```
-bin/            scripts de linha de comando (migrações, seeds, jobs)
+bin/            scripts de linha de comando (migrar, seed, criar-admin; jobs na Fase 9)
 config/         rotas e configurações
 database/
   setup/        criação de papéis, banco e schema (executar uma vez)
@@ -36,6 +36,9 @@ database/
 public/         ÚNICA pasta exposta pelo Apache (index.php, assets)
 src/            código da aplicação (namespace CadGestor\)
   Nucleo/       roteador, requisição, resposta, ambiente, banco, erros, log
+  Banco/        migrador e executor de seeds
+  Seguranca/    hash de senha (e, nas próximas fases, CSRF, sessão, cifra)
+  Servicos/     regras de negócio
   Http/         controllers
 views/          templates PHP
 storage/
@@ -140,21 +143,50 @@ Como segunda trava, o `.htaccess` da raiz do projeto nega qualquer acesso. Se al
 vhost apontar para a raiz por engano, `.env`, `vendor/` e `storage/` continuam
 inacessíveis.
 
-### 6. Verificação
+### 6. Migrações, seeds e administrador inicial
+
+```powershell
+php bin/migrar.php --status   # lista migrações aplicadas e pendentes
+php bin/migrar.php            # aplica as pendentes (usa o papel cadgestor_owner)
+php bin/seed.php              # perfis padrão (pode rodar várias vezes)
+php bin/criar-admin.php --nome="Nome Completo" --email=admin@empresa.com.br
+```
+
+- **Migrações só andam para frente.** Cada arquivo aplicado fica registrado com
+  o checksum. Se você editar uma migração que já rodou, o migrador recusa e para.
+  Correções sempre entram como uma nova migração (exemplo: `0008_corrige_checks_com_nulo.sql`).
+- **Seeds são idempotentes**, ou seja, rodar de novo não duplica nada.
+- **A senha do administrador** é gerada aleatoriamente e exibida **uma única vez**.
+  Ela não fica gravada em nenhum arquivo, e a troca é obrigatória no primeiro login
+  (Fase 2). O script recusa criar um segundo administrador por esse caminho.
+
+### 7. Verificação
 
 | Endereço | Esperado |
 |---|---|
-| http://cadgestor.test/ | Diagnóstico do ambiente com todos os itens "OK" (só fora de produção) |
+| http://cadgestor.test/ | Diagnóstico com todos os itens "OK": ambiente, migrações, perfis, administrador e lista de tabelas (só fora de produção) |
 | http://cadgestor.test/saude | `{"status":"ok","banco":"conectado","schema":"cadgestor"}` |
 | http://cadgestor.test/qualquer-coisa | Página 404 |
 
 ## Testes e padrão de código
 
 ```powershell
-composer test       # PHPUnit
+composer test       # PHPUnit (unitários + integração)
 composer lint       # verifica PSR-12
 composer lint:fix   # corrige o que for automático
 ```
+
+Os **testes de integração** usam um banco separado, o `cadgestor_teste`. Crie-o uma vez:
+
+```powershell
+& "C:\laragon\bin\postgresql\postgresql-18.6-3-windows-x64-binaries\bin\psql.exe" `
+    -h 127.0.0.1 -U postgres -f database/setup/02_criar_banco_teste.sql
+```
+
+A cada execução, os testes **apagam e recriam** o schema desse banco, aplicam as
+migrações e os seeds. Cada teste roda numa transação que é desfeita no final. O nome
+do banco vem do `phpunit.xml` (`DB_TESTE_BANCO`), e os testes se recusam a rodar se
+ele for igual ao `DB_BANCO` do `.env`. Sem o banco de teste, esses testes são pulados.
 
 ## Variáveis do .env
 
@@ -180,10 +212,51 @@ composer lint:fix   # corrige o que for automático
 - **URLs:** parâmetros de rota aceitam apenas UUID, então CPF ou nome nunca aparecem no endereço.
 - **Cabeçalhos de segurança:** toda resposta inclui CSP, `X-Frame-Options: DENY`, `nosniff` e `Referrer-Policy`.
 
+### Modelo de dados (Fase 1)
+
+| Grupo | Tabelas |
+|---|---|
+| Sistema | `usuario_sistema`, `usuario_papel`, `tentativa_login`, `auditoria`, `migracao` |
+| Cadastros | `perfil_vinculo`, `empresa`, `empresa_perfil`, `empresa_horario_padrao`, `catraca` |
+| Pessoas | `pessoa`, `vinculo`, `regra_acesso` |
+| LGPD | `termo_consentimento`, `consentimento`, `biometria` |
+| Operação | `evento_acesso`, `alerta`, `fila_sincronizacao` |
+
+- **CPF e CNPJ são validados também no banco**, pelas funções `cpf_valido` e
+  `cnpj_valido`. O CNPJ aceita o **formato alfanumérico** da Receita, vigente desde
+  julho de 2026 (ex.: `12ABC34501DE35`). Os valores são gravados sem máscara e em maiúsculas.
+- **Regras de acesso** funcionam como lista de permissões. A hierarquia é: regras
+  do vínculo (exceção; se existirem, só elas valem) → regras do perfil na empresa
+  → horário padrão da empresa. Turnos que passam da meia-noite viram dois intervalos
+  (`22:00–24:00` e `00:00–06:00`).
+- **Histórico de vínculos:** vínculos nunca são apagados, só encerrados. Uma pessoa
+  pode ter vínculos com várias empresas e mais de um perfil na mesma empresa.
+- **Trava de consentimento no banco:** um trigger impede gravar ou reativar
+  biometria sem consentimento **ativo da própria pessoa**. Biometria excluída tem o
+  template e o nonce apagados de fato, não só marcados.
+- **Menores de 18 anos:** o consentimento exige nome, CPF válido e parentesco do responsável.
+- **Termo imutável:** depois de publicado, o texto do termo não muda; o hash SHA-256
+  é conferido pelo banco. Para mudar o texto, publique uma nova versão.
+- **Foto facial:** a tabela `foto_facial` **não** foi criada. O padrão é guardar só o
+  template. Ela só será criada se o fabricante da catraca exigir a foto para gerar o template.
+- **Anonimização:** depois do prazo de retenção, a pessoa é anonimizada (CPF removido),
+  e não excluída, para que os eventos de acesso continuem consistentes.
+- **Permissões do papel `cadgestor_app`:** não pode apagar nem alterar `auditoria` e
+  `evento_acesso`; não pode apagar `pessoa`, `vinculo`, `consentimento` e `biometria`;
+  não pode criar nem alterar tabelas. Exclusões por retenção rodam com o papel de manutenção.
+- **Atenção com NULL em CHECK:** no PostgreSQL, um CHECK cujo resultado é NULL é
+  **aceito**. Por isso as constraints usam `IS NOT NULL` explicitamente (ver migração 0008).
+
+> **Base legal (validar com o jurídico):** todos os perfis nascem com
+> `base_legal = 'consentimento'` e `base_legal_validada = false`. O banco exige
+> consentimento para **qualquer** biometria, como pede o escopo. Se o jurídico
+> definir outra base legal para algum perfil (ex.: art. 11, II, "g" para
+> funcionários), será preciso uma migração para ajustar essa trava.
+
 ## Roadmap
 
 - [x] Fase 0: estrutura, Composer, .env, conexão PDO, README
-- [ ] Fase 1: migrações e seeds
+- [x] Fase 1: migrações e seeds
 - [ ] Fase 2: autenticação, papéis, CSRF, sessão
 - [ ] Fase 3: empresas
 - [ ] Fase 4: perfis e catracas

@@ -11,6 +11,9 @@
         <testsuite name="Unit">
             <directory>tests/Unit</directory>
         </testsuite>
+        <testsuite name="Integracao">
+            <directory>tests/Integracao</directory>
+        </testsuite>
     </testsuites>
     <source>
         <include>
@@ -20,5 +23,7 @@
     <php>
         <ini name="error_reporting" value="-1"/>
         <ini name="date.timezone" value="America/Fortaleza"/>
+        <!-- Banco exclusivo dos testes de integração: o schema é APAGADO e recriado. -->
+        <env name="DB_TESTE_BANCO" value="cadgestor_teste"/>
     </php>
 </phpunit>

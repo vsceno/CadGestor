@@ -5,6 +5,7 @@
     <file>src</file>
     <file>config</file>
     <file>public/index.php</file>
+    <file>bin</file>
     <file>tests</file>
 
     <arg name="extensions" value="php"/>

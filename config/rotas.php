@@ -12,7 +12,7 @@ use CadGestor\Nucleo\Aplicacao;
 use CadGestor\Nucleo\Roteador;
 
 return static function (Roteador $rotas, Aplicacao $app): void {
-    $inicio = new InicioController($app->ambiente, $app->banco);
+    $inicio = new InicioController($app->ambiente, $app->banco, $app->raiz . '/database/migracoes');
     $saude = new SaudeController($app->banco, $app->log);
 
     $rotas->get('/', $inicio->index(...));
