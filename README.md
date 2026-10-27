@@ -1,17 +1,17 @@
 # CadGestor
 
-Sistema de controle de acesso fÃ­sico e cadastro de pessoas vinculadas a empresas
-(funcionÃ¡rios, alunos, prestadores), com liberaÃ§Ã£o de catraca por biometria digital
+Sistema de controle de acesso físico e cadastro de pessoas vinculadas a empresas
+(funcionários, alunos, prestadores), com liberação de catraca por biometria digital
 ou reconhecimento facial.
 
-> **Aviso LGPD:** dados biomÃ©tricos sÃ£o dados pessoais sensÃ­veis (art. 5Âº, II, e
-> art. 11 da LGPD). A base legal de cada perfil de vÃ­nculo Ã© **configurÃ¡vel**, mas
-> deve ser **validada pelo jurÃ­dico do cliente** antes da implantaÃ§Ã£o. O padrÃ£o do
-> sistema Ã© exigir consentimento especÃ­fico.
+> **Aviso LGPD:** dados biométricos são dados pessoais sensíveis (art. 5º, II, e
+> art. 11 da LGPD). A base legal de cada perfil de vínculo é **configurável**, mas
+> deve ser **validada pelo jurídico do cliente** antes da implantação. O padrão do
+> sistema é exigir consentimento específico.
 
 ## Stack
 
-| Componente | VersÃ£o |
+| Componente | Versão |
 |---|---|
 | Windows + Laragon | 6 |
 | Apache (Laragon) | 2.4 |
@@ -21,44 +21,49 @@ ou reconhecimento facial.
 | Testes | PHPUnit 13 |
 | Estilo | PSR-12 (PHP_CodeSniffer), autoload PSR-4 |
 
-Sem framework completo: MVC prÃ³prio e leve (roteador, controllers, services,
+Sem framework completo: MVC próprio e leve (roteador, controllers, services,
 repositories com PDO e views em PHP puro).
 
 ## Estrutura de pastas
 
 ```
-bin/            scripts de linha de comando (migrar, seed, criar-admin; jobs na Fase 9)
-config/         rotas e configuraÃ§Ãµes
+bin/            CLI: migrar, seed, criar-admin, gerar-chave, manutencao
+config/         rotas.php e servicos.php (quem depende de quem)
 database/
-  setup/        criaÃ§Ã£o de papÃ©is, banco e schema (executar uma vez)
-  migracoes/    migraÃ§Ãµes SQL versionadas (Fase 1)
-  seeds/        dados iniciais (Fase 1)
-public/         ÃšNICA pasta exposta pelo Apache (index.php, assets)
-src/            cÃ³digo da aplicaÃ§Ã£o (namespace CadGestor\)
-  Nucleo/       roteador, requisiÃ§Ã£o, resposta, ambiente, banco, erros, log
-  Banco/        migrador e executor de seeds
-  Seguranca/    hash de senha (e, nas prÃ³ximas fases, CSRF, sessÃ£o, cifra)
-  Servicos/     regras de negÃ³cio
-  Http/         controllers
-views/          templates PHP
+  setup/        criação de papéis, banco e schema (executar uma vez)
+  migracoes/    migrações SQL versionadas (0001..0009)
+  seeds/        perfis padrão e termo de consentimento modelo
+docs/           revisão de segurança e LGPD
+public/         ÚNICA pasta exposta pelo Apache (index.php, assets)
+src/            código da aplicação (namespace CadGestor\)
+  Nucleo/       roteador, requisição, resposta, ambiente, banco, erros, log, CSV
+  Http/         controllers e middlewares (sessão, CSRF, login, papel)
+  Dominio/      regras puras: Cpf, Cnpj, IntervaloHorario, ValidadeVinculo, Idade, PoliticaRetencao
+  Servicos/     regras de negócio e auditoria
+  Repositorios/ SQL com PDO (prepared statements)
+  Acesso/       DecisaoAcesso, API da catraca e sincronização com dispositivos
+  Biometria/    contrato IdentificadorBiometrico, simulado e adaptadores de fabricantes
+  Seguranca/    sessão, CSRF, senhas, autenticação, cifra da biometria
+  Banco/        migrador, seeds e transações
+views/          templates PHP (saída sempre com e())
 storage/
   logs/         logs de erro (sem dados pessoais)
   chaves/       chave de cifra da biometria (fora do git)
-tests/          PHPUnit
+tests/          PHPUnit: Unit/ (sem banco) e Integracao/ (banco cadgestor_teste)
 ```
 
-## InstalaÃ§Ã£o no Laragon
+## Instalação no Laragon
 
-### 1. PrÃ©-requisitos
+### 1. Pré-requisitos
 
 1. Laragon 6 com **PHP 8.5.5** selecionado (Menu > PHP > Version).
 2. **PostgreSQL 18.6** selecionado e iniciado (Menu > PostgreSQL > Version).
-   Se houver outra versÃ£o instalada (ex.: 14), confirme que sÃ³ a 18.6 estÃ¡ rodando na 5432:
+   Se houver outra versão instalada (ex.: 14), confirme que só a 18.6 está rodando na 5432:
    ```powershell
    & "C:\laragon\bin\postgresql\postgresql-18.6-3-windows-x64-binaries\bin\psql.exe" -h 127.0.0.1 -U postgres -c "select version();"
    ```
-3. ExtensÃµes do PHP habilitadas em `C:\laragon\bin\php\php-8.5.5-Win32-vs17-x64\php.ini`
-   (remova o `;` do inÃ­cio da linha):
+3. Extensões do PHP habilitadas em `C:\laragon\bin\php\php-8.5.5-Win32-vs17-x64\php.ini`
+   (remova o `;` do início da linha):
    ```ini
    extension=pdo_pgsql
    extension=pgsql
@@ -68,9 +73,9 @@ tests/          PHPUnit
    extension=intl
    extension=sodium
    ```
-   `json` jÃ¡ vem embutido no PHP 8. Depois, recarregue o Apache no Laragon.
+   `json` já vem embutido no PHP 8. Depois, recarregue o Apache no Laragon.
 
-### 2. CÃ³digo e dependÃªncias
+### 2. Código e dependências
 
 ```powershell
 cd C:\laragon\www
@@ -81,15 +86,15 @@ composer install
 
 ### 3. Banco de dados
 
-O banco usa **dois papÃ©is**, como numa empresa em que o arquiteto (owner) projeta
-o prÃ©dio e o funcionÃ¡rio (app) sÃ³ usa as salas:
+O banco usa **dois papéis**, como numa empresa em que o arquiteto (owner) projeta
+o prédio e o funcionário (app) só usa as salas:
 
-| Papel | Uso | PermissÃµes |
+| Papel | Uso | Permissões |
 |---|---|---|
-| `cadgestor_owner` | migraÃ§Ãµes (Fase 1) | dono do schema, cria e altera tabelas |
-| `cadgestor_app` | aplicaÃ§Ã£o web e API | apenas SELECT/INSERT/UPDATE/DELETE |
+| `cadgestor_owner` | migrações (Fase 1) | dono do schema, cria e altera tabelas |
+| `cadgestor_app` | aplicação web e API | apenas SELECT/INSERT/UPDATE/DELETE |
 
-Se a aplicaÃ§Ã£o for comprometida, o invasor nÃ£o consegue apagar tabelas nem mudar a estrutura.
+Se a aplicação for comprometida, o invasor não consegue apagar tabelas nem mudar a estrutura.
 
 Gere duas senhas fortes e execute o script como `postgres`:
 
@@ -103,11 +108,11 @@ $app   = php -r "echo bin2hex(random_bytes(18));"
 "DB_SENHA=$app"; "DB_MIGRACAO_SENHA=$owner"   # anote para o .env
 ```
 
-O script cria os papÃ©is, o banco `cadgestor` (UTF-8, collation ICU pt-BR) e o
-schema `cadgestor`, e define as permissÃµes padrÃ£o.
+O script cria os papéis, o banco `cadgestor` (UTF-8, collation ICU pt-BR) e o
+schema `cadgestor`, e define as permissões padrão.
 
-> No Laragon, o `pg_hba.conf` costuma vir com `trust` para conexÃµes locais, ou seja,
-> sem cobrar senha. Em produÃ§Ã£o, use `scram-sha-256`.
+> No Laragon, o `pg_hba.conf` costuma vir com `trust` para conexões locais, ou seja,
+> sem cobrar senha. Em produção, use `scram-sha-256`.
 
 ### 4. Arquivo .env
 
@@ -121,7 +126,7 @@ prefira o editor.
 
 ### 5. Virtual host `cadgestor.test`
 
-O vhost automÃ¡tico do Laragon aponta para a **raiz** do projeto, e o CadGestor precisa
+O vhost automático do Laragon aponta para a **raiz** do projeto, e o CadGestor precisa
 apontar para `public/`. Crie `C:\laragon\etc\apache2\sites-enabled\01-cadgestor.test.conf`:
 
 ```apache
@@ -136,159 +141,159 @@ apontar para `public/`. Crie `C:\laragon\etc\apache2\sites-enabled\01-cadgestor.
 ```
 
 O prefixo `01-` faz esse arquivo ser carregado antes do `auto.CadGestor.test.conf`
-gerado pelo Laragon, entÃ£o ele tem prioridade. Depois clique em **Recarregar** no Laragon,
-que tambÃ©m adiciona `cadgestor.test` ao arquivo `hosts`.
+gerado pelo Laragon, então ele tem prioridade. Depois clique em **Recarregar** no Laragon,
+que também adiciona `cadgestor.test` ao arquivo `hosts`.
 
 Como segunda trava, o `.htaccess` da raiz do projeto nega qualquer acesso. Se algum
 vhost apontar para a raiz por engano, `.env`, `vendor/` e `storage/` continuam
-inacessÃ­veis.
+inacessíveis.
 
-### 6. MigraÃ§Ãµes, seeds e administrador inicial
+### 6. Migrações, seeds e administrador inicial
 
 ```powershell
-php bin/migrar.php --status   # lista migraÃ§Ãµes aplicadas e pendentes
+php bin/migrar.php --status   # lista migrações aplicadas e pendentes
 php bin/migrar.php            # aplica as pendentes (usa o papel cadgestor_owner)
-php bin/seed.php              # perfis padrÃ£o (pode rodar vÃ¡rias vezes)
+php bin/seed.php              # perfis padrão (pode rodar várias vezes)
 php bin/criar-admin.php --nome="Nome Completo" --email=admin@empresa.com.br
 ```
 
-- **MigraÃ§Ãµes sÃ³ andam para frente.** Cada arquivo aplicado fica registrado com
-  o checksum. Se vocÃª editar uma migraÃ§Ã£o que jÃ¡ rodou, o migrador recusa e para.
-  CorreÃ§Ãµes sempre entram como uma nova migraÃ§Ã£o (exemplo: `0008_corrige_checks_com_nulo.sql`).
-- **Seeds sÃ£o idempotentes**, ou seja, rodar de novo nÃ£o duplica nada.
-- **A senha do administrador** Ã© gerada aleatoriamente e exibida **uma Ãºnica vez**.
-  Ela nÃ£o fica gravada em nenhum arquivo, e a troca Ã© obrigatÃ³ria no primeiro login
+- **Migrações só andam para frente.** Cada arquivo aplicado fica registrado com
+  o checksum. Se você editar uma migração que já rodou, o migrador recusa e para.
+  Correções sempre entram como uma nova migração (exemplo: `0008_corrige_checks_com_nulo.sql`).
+- **Seeds são idempotentes**, ou seja, rodar de novo não duplica nada.
+- **A senha do administrador** é gerada aleatoriamente e exibida **uma única vez**.
+  Ela não fica gravada em nenhum arquivo, e a troca é obrigatória no primeiro login
   (Fase 2). O script recusa criar um segundo administrador por esse caminho.
 
-### 7. VerificaÃ§Ã£o
+### 7. Verificação
 
-| EndereÃ§o | Esperado |
+| Endereço | Esperado |
 |---|---|
 | http://cadgestor.test/ | Tela de login |
-| http://cadgestor.test/diagnostico | (administrador, fora de produÃ§Ã£o) DiagnÃ³stico de ambiente, migraÃ§Ãµes, perfis e tabelas |
+| http://cadgestor.test/diagnostico | (administrador, fora de produção) Diagnóstico de ambiente, migrações, perfis e tabelas |
 | http://cadgestor.test/saude | `{"status":"ok","banco":"conectado","schema":"cadgestor"}` |
-| http://cadgestor.test/qualquer-coisa | PÃ¡gina 404 |
+| http://cadgestor.test/qualquer-coisa | Página 404 |
 
-## Testes e padrÃ£o de cÃ³digo
+## Testes e padrão de código
 
 ```powershell
-composer test       # PHPUnit (unitÃ¡rios + integraÃ§Ã£o)
+composer test       # PHPUnit (unitários + integração)
 composer lint       # verifica PSR-12
-composer lint:fix   # corrige o que for automÃ¡tico
+composer lint:fix   # corrige o que for automático
 ```
 
-Os **testes de integraÃ§Ã£o** usam um banco separado, o `cadgestor_teste`. Crie-o uma vez:
+Os **testes de integração** usam um banco separado, o `cadgestor_teste`. Crie-o uma vez:
 
 ```powershell
 & "C:\laragon\bin\postgresql\postgresql-18.6-3-windows-x64-binaries\bin\psql.exe" `
     -h 127.0.0.1 -U postgres -f database/setup/02_criar_banco_teste.sql
 ```
 
-A cada execuÃ§Ã£o, os testes **apagam e recriam** o schema desse banco, aplicam as
-migraÃ§Ãµes e os seeds. Cada teste roda numa transaÃ§Ã£o que Ã© desfeita no final. O nome
+A cada execução, os testes **apagam e recriam** o schema desse banco, aplicam as
+migrações e os seeds. Cada teste roda numa transação que é desfeita no final. O nome
 do banco vem do `phpunit.xml` (`DB_TESTE_BANCO`), e os testes se recusam a rodar se
-ele for igual ao `DB_BANCO` do `.env`. Sem o banco de teste, esses testes sÃ£o pulados.
+ele for igual ao `DB_BANCO` do `.env`. Sem o banco de teste, esses testes são pulados.
 
-## VariÃ¡veis do .env
+## Variáveis do .env
 
-| VariÃ¡vel | Fase | DescriÃ§Ã£o |
+| Variável | Fase | Descrição |
 |---|---|---|
 | `APP_AMBIENTE` | 0 | `desenvolvimento`, `teste` ou `producao` |
-| `APP_DEBUG` | 0 | `true` mostra detalhes de erro na tela; **sempre ignorado em produÃ§Ã£o** |
+| `APP_DEBUG` | 0 | `true` mostra detalhes de erro na tela; **sempre ignorado em produção** |
 | `APP_URL` | 0 | URL base (ex.: `http://cadgestor.test`) |
-| `APP_FUSO` | 0 | Fuso das regras de horÃ¡rio (padrÃ£o `America/Fortaleza`) |
+| `APP_FUSO` | 0 | Fuso das regras de horário (padrão `America/Fortaleza`) |
 | `DB_HOST`, `DB_PORTA` | 0 | Servidor PostgreSQL |
 | `DB_BANCO`, `DB_SCHEMA` | 0 | Banco e schema (`cadgestor`) |
-| `DB_USUARIO`, `DB_SENHA` | 0 | Papel da aplicaÃ§Ã£o (`cadgestor_app`) |
-| `DB_MIGRACAO_USUARIO`, `DB_MIGRACAO_SENHA` | 1 | Papel de migraÃ§Ã£o (`cadgestor_owner`) |
-| `APP_SEGREDO` | 2 | Segredo (64 hex) para HMAC de identificadores tÃ©cnicos |
-| `SESSAO_INATIVIDADE_MINUTOS` | 2 | Minutos sem uso atÃ© a sessÃ£o expirar (padrÃ£o 30) |
-| `SESSAO_SEGURA` | 2 | Cookie de sessÃ£o sÃ³ por HTTPS (`true` em produÃ§Ã£o) |
-| `CHAVE_CIFRA_ARQUIVO` | 6 | Caminho da chave de cifra dos templates biomÃ©tricos (fora de `public/`) |
+| `DB_USUARIO`, `DB_SENHA` | 0 | Papel da aplicação (`cadgestor_app`) |
+| `DB_MIGRACAO_USUARIO`, `DB_MIGRACAO_SENHA` | 1 | Papel de migração (`cadgestor_owner`) |
+| `APP_SEGREDO` | 2 | Segredo (64 hex) para HMAC de identificadores técnicos |
+| `SESSAO_INATIVIDADE_MINUTOS` | 2 | Minutos sem uso até a sessão expirar (padrão 30) |
+| `SESSAO_SEGURA` | 2 | Cookie de sessão só por HTTPS (`true` em produção) |
+| `CHAVE_CIFRA_ARQUIVO` | 6 | Caminho da chave de cifra dos templates biométricos (fora de `public/`) |
 | `IDENTIFICADOR_BIOMETRICO` | 6 | Adaptador do hardware: `simulado` ou o do fabricante |
 | `LIMIAR_CONFIANCA` | 7 | Confiança mínima (0 a 1) para aceitar a identificação (padrão 0.80) |
-| `RETENCAO_DIAS` | 9 | Dias apÃ³s o fim do vÃ­nculo para excluir biometria e dados. **ProvisÃ³rio: validar com o jurÃ­dico** |
+| `RETENCAO_DIAS` | 9 | Dias após o fim do vínculo para excluir biometria e anonimizar o titular. **Provisório: validar com o jurídico** |
 
-## DecisÃµes tÃ©cnicas
+## Decisões técnicas
 
-- **Datas:** o banco grava `timestamptz` em UTC; a conversÃ£o para `APP_FUSO` acontece na exibiÃ§Ã£o e nas regras de horÃ¡rio.
-- **IDs:** UUID gerado pelo banco com `uuidv7()` (PostgreSQL 18), que Ã© ordenado pelo tempo e mantÃ©m os Ã­ndices compactos.
-- **Erros:** o log registra sÃ³ a classe do erro, o arquivo, a linha e um cÃ³digo de referÃªncia, **nunca a mensagem**, porque mensagens de banco podem conter CPF e outros valores. O usuÃ¡rio vÃª sÃ³ o cÃ³digo de referÃªncia.
-- **URLs:** parÃ¢metros de rota aceitam apenas UUID, entÃ£o CPF ou nome nunca aparecem no endereÃ§o.
-- **CabeÃ§alhos de seguranÃ§a:** toda resposta inclui CSP, `X-Frame-Options: DENY`, `nosniff` e `Referrer-Policy`.
+- **Datas:** o banco grava `timestamptz` em UTC; a conversão para `APP_FUSO` acontece na exibição e nas regras de horário.
+- **IDs:** UUID gerado pelo banco com `uuidv7()` (PostgreSQL 18), que é ordenado pelo tempo e mantém os índices compactos.
+- **Erros:** o log registra só a classe do erro, o arquivo, a linha e um código de referência, **nunca a mensagem**, porque mensagens de banco podem conter CPF e outros valores. O usuário vê só o código de referência.
+- **URLs:** parâmetros de rota aceitam apenas UUID, então CPF ou nome nunca aparecem no endereço.
+- **Cabeçalhos de segurança:** toda resposta inclui CSP, `X-Frame-Options: DENY`, `nosniff` e `Referrer-Policy`.
 
-### AutenticaÃ§Ã£o e permissÃµes (Fase 2)
+### Autenticação e permissões (Fase 2)
 
 | Papel | Acesso |
 |---|---|
-| `administrador` | Tudo, incluindo usuÃ¡rios, perfis, termos LGPD, auditoria e diagnÃ³stico |
-| `cadastro_empresa` | Empresas, horÃ¡rios, catracas e regras de acesso por perfil |
-| `cadastro_pessoa` | Pessoas, vÃ­nculos, consentimento e biometria |
-| `consulta` | RelatÃ³rios, exportaÃ§Ã£o CSV e alertas (somente leitura) |
+| `administrador` | Tudo, incluindo usuários, perfis, termos LGPD, auditoria e diagnóstico |
+| `cadastro_empresa` | Empresas, horários, catracas e regras de acesso por perfil |
+| `cadastro_pessoa` | Pessoas, vínculos, consentimento e biometria |
+| `consulta` | Relatórios, exportação CSV e alertas (somente leitura) |
 
-Um usuÃ¡rio pode ter vÃ¡rios papÃ©is. Os papÃ©is sÃ£o verificados **em cada rota**
-pelos middlewares, e o menu sÃ³ mostra o que o usuÃ¡rio pode acessar.
+Um usuário pode ter vários papéis. Os papéis são verificados **em cada rota**
+pelos middlewares, e o menu só mostra o que o usuário pode acessar.
 
-- **Senhas:** Argon2id, com mÃ­nimo de 12 caracteres, recusa de senhas comuns e
-  troca obrigatÃ³ria no primeiro acesso. Hashes antigos sÃ£o refeitos no login.
-- **ForÃ§a bruta:** apÃ³s 5 falhas por e-mail ou 20 por IP em 15 minutos, o login Ã©
+- **Senhas:** Argon2id, com mínimo de 12 caracteres, recusa de senhas comuns e
+  troca obrigatória no primeiro acesso. Hashes antigos são refeitos no login.
+- **Força bruta:** após 5 falhas por e-mail ou 20 por IP em 15 minutos, o login é
   bloqueado. O e-mail fica gravado como HMAC (`APP_SEGREDO`), nunca em texto. A
-  resposta Ã© a mesma para e-mail inexistente e senha errada, inclusive no tempo.
-- **SessÃ£o:** o cookie `cadgestor_sessao` usa `HttpOnly` e `SameSite=Strict`, e
+  resposta é a mesma para e-mail inexistente e senha errada, inclusive no tempo.
+- **Sessão:** o cookie `cadgestor_sessao` usa `HttpOnly` e `SameSite=Strict`, e
   `Secure` quando `SESSAO_SEGURA=true`. O ID muda no login e na troca de senha. A
-  sessÃ£o expira por inatividade (`SESSAO_INATIVIDADE_MINUTOS`) e apÃ³s 12 horas.
-  UsuÃ¡rio desativado perde o acesso na hora.
-- **CSRF:** todo POST exige token; sem ele, a resposta Ã© 403.
-- **Auditoria:** login, falha de login, logout, troca de senha e cadastro de usuÃ¡rios.
+  sessão expira por inatividade (`SESSAO_INATIVIDADE_MINUTOS`) e após 12 horas.
+  Usuário desativado perde o acesso na hora.
+- **CSRF:** todo POST exige token; sem ele, a resposta é 403.
+- **Auditoria:** login, falha de login, logout, troca de senha e cadastro de usuários.
 
 ### Empresas, perfis, catracas e regras (Fases 3 e 4)
 
-- **Empresas:** cadastro com validaÃ§Ã£o de CNPJ (numÃ©rico e alfanumÃ©rico), CEP, UF,
-  e-mail e telefone do responsÃ¡vel legal. Empresas sÃ£o inativadas, nunca apagadas.
-  Em cada empresa se configuram os **perfis aceitos** e o **horÃ¡rio padrÃ£o**.
+- **Empresas:** cadastro com validação de CNPJ (numérico e alfanumérico), CEP, UF,
+  e-mail e telefone do responsável legal. Empresas são inativadas, nunca apagadas.
+  Em cada empresa se configuram os **perfis aceitos** e o **horário padrão**.
 - **Perfis** (somente administrador): novos perfis entram pela tela, sem mudar
-  cÃ³digo. Cada perfil registra a base legal e se ela jÃ¡ foi **validada pelo jurÃ­dico**.
+  código. Cada perfil registra a base legal e se ela já foi **validada pelo jurídico**.
 - **Catracas:** ao cadastrar, o sistema gera um token (`cgt_` + 64 caracteres
-  hexadecimais) exibido **uma Ãºnica vez**; o banco guarda sÃ³ o SHA-256. Ao gerar
+  hexadecimais) exibido **uma única vez**; o banco guarda só o SHA-256. Ao gerar
   um novo token, o anterior para de funcionar na hora.
-- **Regras de acesso:** uma matriz perfil Ã— catraca Ã— dia Ã— faixa de horÃ¡rio, como
-  lista de permissÃµes (fim exclusivo; `00:00` no fim = meia-noite). Faixas sobrepostas
-  na mesma catraca sÃ£o recusadas.
+- **Regras de acesso:** uma matriz perfil × catraca × dia × faixa de horário, como
+  lista de permissões (fim exclusivo; `00:00` no fim = meia-noite). Faixas sobrepostas
+  na mesma catraca são recusadas.
 
 #### Modo de falha e funcionamento offline (requisito)
 
 | Modo | Sem resposta do servidor | Indicado para |
 |---|---|---|
-| `bloquear` (padrÃ£o) | A catraca mantÃ©m o bloqueio | Ãreas restritas |
+| `bloquear` (padrão) | A catraca mantém o bloqueio | Áreas restritas |
 | `liberar` | A catraca libera a passagem | Fluxos onde travar causa risco |
 
 - A API devolve o `modo_falha` de cada catraca (`GET /api/v1/configuracao`), para que o
-  dispositivo saiba como agir sem conexÃ£o.
-- **Offline:** o dispositivo deve guardar os eventos localmente e reenviÃ¡-los com
-  `data_hora` original e `offline: true`. Eles sÃ£o gravados como eventos offline.
-  A decisÃ£o offline depende do recurso do fabricante (lista local de templates) e fica
+  dispositivo saiba como agir sem conexão.
+- **Offline:** o dispositivo deve guardar os eventos localmente e reenviá-los com
+  `data_hora` original e `offline: true`. Eles são gravados como eventos offline.
+  A decisão offline depende do recurso do fabricante (lista local de templates) e fica
   para quando o modelo da catraca for definido.
-- **EmergÃªncia/incÃªndio:** a liberaÃ§Ã£o das rotas de fuga **nÃ£o deve depender do
-  software**. O correto Ã© intertravamento por hardware com o alarme (destravamento
-  fÃ­sico, conforme normas do Corpo de Bombeiros). O sistema apenas registra.
+- **Emergência/incêndio:** a liberação das rotas de fuga **não deve depender do
+  software**. O correto é intertravamento por hardware com o alarme (destravamento
+  físico, conforme normas do Corpo de Bombeiros). O sistema apenas registra.
 
-### Pessoas e vÃ­nculos (Fase 5)
+### Pessoas e vínculos (Fase 5)
 
-- **Pessoas:** CPF validado e Ãºnico (uma pessoa por CPF), nome completo, documento
-  de identidade, nascimento e contato. A **busca por nome/CPF usa POST**, entÃ£o esses
-  dados nÃ£o aparecem na URL, no histÃ³rico do navegador nem nos logs do Apache.
+- **Pessoas:** CPF validado e único (uma pessoa por CPF), nome completo, documento
+  de identidade, nascimento e contato. A **busca por nome/CPF usa POST**, então esses
+  dados não aparecem na URL, no histórico do navegador nem nos logs do Apache.
   Listagens mostram o CPF mascarado (`***.982.247-**`).
-- **VÃ­nculos:** uma pessoa pode ter vÃ­nculos com vÃ¡rias empresas e mais de um perfil
-  na mesma empresa. SÃ³ aparecem combinaÃ§Ãµes de empresa ativa com perfil aceito.
-  VÃ­nculos sÃ£o **suspensos** ou **encerrados** (com motivo e data), nunca apagados.
-- **Validade** (`Dominio\ValidadeVinculo`): um vÃ­nculo Ã© *vigente* quando o status Ã©
-  `ativo` e a data estÃ¡ entre inÃ­cio e fim, **ambos inclusivos**. Fora disso ele fica
-  *ainda nÃ£o iniciado*, *vencido*, *suspenso* ou *encerrado*. O painel avisa quando
+- **Vínculos:** uma pessoa pode ter vínculos com várias empresas e mais de um perfil
+  na mesma empresa. Só aparecem combinações de empresa ativa com perfil aceito.
+  Vínculos são **suspensos** ou **encerrados** (com motivo e data), nunca apagados.
+- **Validade** (`Dominio\ValidadeVinculo`): um vínculo é *vigente* quando o status é
+  `ativo` e a data está entre início e fim, **ambos inclusivos**. Fora disso ele fica
+  *ainda não iniciado*, *vencido*, *suspenso* ou *encerrado*. O painel avisa quando
   faltam 30 dias ou menos para vencer.
-- **ExceÃ§Ã£o por vÃ­nculo:** regras prÃ³prias **substituem** as do perfil para aquele vÃ­nculo.
-- **SincronizaÃ§Ã£o:** ao criar um vÃ­nculo, as biometrias da pessoa entram na fila para
-  as catracas da empresa. Ao encerrar o Ãºltimo vÃ­nculo com uma empresa, entra na fila a
-  **remoÃ§Ã£o** da pessoa das catracas dela.
+- **Exceção por vínculo:** regras próprias **substituem** as do perfil para aquele vínculo.
+- **Sincronização:** ao criar um vínculo, as biometrias da pessoa entram na fila para
+  as catracas da empresa. Ao encerrar o último vínculo com uma empresa, entra na fila a
+  **remoção** da pessoa das catracas dela.
 
 ### LGPD: consentimento e biometria (Fase 6)
 
@@ -395,6 +400,43 @@ curl -X POST http://cadgestor.test/api/v1/acesso \
   tabela e usuário, exibição de "antes/depois" e exportação CSV. O papel da aplicação
   não consegue alterar nem apagar esses registros.
 
+### Manutenção, retenção e segurança (Fase 9)
+
+```powershell
+php bin/manutencao.php --simular                    # mostra o que seria feito (não altera nada)
+php bin/manutencao.php --simular --data=2027-02-01  # prevê o efeito numa data futura
+php bin/manutencao.php                              # executa todas as tarefas
+php bin/manutencao.php --tarefa=retencao            # uma tarefa: vinculos|retencao|catracas|limpeza
+```
+
+| Tarefa | O que faz |
+|---|---|
+| `vinculos` | Encerra vínculos com validade expirada e agenda a remoção da pessoa nas catracas |
+| `retencao` | Para quem está sem vínculo há mais de `RETENCAO_DIAS`: **apaga as biometrias**, apaga os dados do responsável no consentimento e **anonimiza** o titular (nome, CPF, documento, nascimento e contato); agenda a remoção nos dispositivos |
+| `catracas` | Gera alerta para catracas ativas sem contato há mais de 30 minutos |
+| `limpeza` | Remove tentativas de login e itens concluídos da fila com mais de 90 dias |
+
+Cada execução é registrada na auditoria (`job_manutencao` e `anonimizar`) e no log, só
+com contagens. O job usa o papel `cadgestor_owner`, porque o papel da aplicação não tem
+permissão de exclusão.
+
+- **Política de retenção** (`Dominio\PoliticaRetencao`): a pessoa é elegível quando não
+  tem vínculo em vigor e já passaram mais de N dias da **maior** data de fim (ou da data de
+  cadastro, se nunca teve vínculo). O registro do consentimento é mantido (versão, hash e
+  data) como prova de licitude, sem dados do responsável. Os eventos de acesso continuam,
+  ligados ao registro anonimizado.
+
+**Agendamento no Windows** (todo dia às 02:00):
+
+```powershell
+schtasks /Create /TN "CadGestor - manutencao" /SC DAILY /ST 02:00 /RU SYSTEM `
+  /TR "C:\laragon\bin\php\php-8.5.5-Win32-vs17-x64\php.exe C:\laragon\www\CadGestor\bin\manutencao.php"
+```
+
+**Revisão de segurança:** veja [docs/revisao-seguranca.md](docs/revisao-seguranca.md), com o
+checklist do escopo, as verificações feitas, as correções, o que configurar em
+produção e os riscos residuais.
+
 ### Modelo de dados (Fase 1)
 
 | Grupo | Tabelas |
@@ -403,48 +445,48 @@ curl -X POST http://cadgestor.test/api/v1/acesso \
 | Cadastros | `perfil_vinculo`, `empresa`, `empresa_perfil`, `empresa_horario_padrao`, `catraca` |
 | Pessoas | `pessoa`, `vinculo`, `regra_acesso` |
 | LGPD | `termo_consentimento`, `consentimento`, `biometria` |
-| OperaÃ§Ã£o | `evento_acesso`, `alerta`, `fila_sincronizacao` |
+| Operação | `evento_acesso`, `alerta`, `fila_sincronizacao` |
 
-- **CPF e CNPJ sÃ£o validados tambÃ©m no banco**, pelas funÃ§Ãµes `cpf_valido` e
-  `cnpj_valido`. O CNPJ aceita o **formato alfanumÃ©rico** da Receita, vigente desde
-  julho de 2026 (ex.: `12ABC34501DE35`). Os valores sÃ£o gravados sem mÃ¡scara e em maiÃºsculas.
-- **Regras de acesso** funcionam como lista de permissÃµes. A hierarquia Ã©: regras
-  do vÃ­nculo (exceÃ§Ã£o; se existirem, sÃ³ elas valem) â†’ regras do perfil na empresa
-  â†’ horÃ¡rio padrÃ£o da empresa. Turnos que passam da meia-noite viram dois intervalos
-  (`22:00â€“24:00` e `00:00â€“06:00`).
-- **HistÃ³rico de vÃ­nculos:** vÃ­nculos nunca sÃ£o apagados, sÃ³ encerrados. Uma pessoa
-  pode ter vÃ­nculos com vÃ¡rias empresas e mais de um perfil na mesma empresa.
+- **CPF e CNPJ são validados também no banco**, pelas funções `cpf_valido` e
+  `cnpj_valido`. O CNPJ aceita o **formato alfanumérico** da Receita, vigente desde
+  julho de 2026 (ex.: `12ABC34501DE35`). Os valores são gravados sem máscara e em maiúsculas.
+- **Regras de acesso** funcionam como lista de permissões. A hierarquia é: regras
+  do vínculo (exceção; se existirem, só elas valem) → regras do perfil na empresa
+  → horário padrão da empresa. Turnos que passam da meia-noite viram dois intervalos
+  (`22:00–24:00` e `00:00–06:00`).
+- **Histórico de vínculos:** vínculos nunca são apagados, só encerrados. Uma pessoa
+  pode ter vínculos com várias empresas e mais de um perfil na mesma empresa.
 - **Trava de consentimento no banco:** um trigger impede gravar ou reativar
-  biometria sem consentimento **ativo da prÃ³pria pessoa**. Biometria excluÃ­da tem o
-  template e o nonce apagados de fato, nÃ£o sÃ³ marcados.
-- **Menores de 18 anos:** o consentimento exige nome, CPF vÃ¡lido e parentesco do responsÃ¡vel.
-- **Termo imutÃ¡vel:** depois de publicado, o texto do termo nÃ£o muda; o hash SHA-256
-  Ã© conferido pelo banco. Para mudar o texto, publique uma nova versÃ£o.
-- **Foto facial:** a tabela `foto_facial` **nÃ£o** foi criada. O padrÃ£o Ã© guardar sÃ³ o
-  template. Ela sÃ³ serÃ¡ criada se o fabricante da catraca exigir a foto para gerar o template.
-- **AnonimizaÃ§Ã£o:** depois do prazo de retenÃ§Ã£o, a pessoa Ã© anonimizada (CPF removido),
-  e nÃ£o excluÃ­da, para que os eventos de acesso continuem consistentes.
-- **PermissÃµes do papel `cadgestor_app`:** nÃ£o pode apagar nem alterar `auditoria` e
-  `evento_acesso`; nÃ£o pode apagar `pessoa`, `vinculo`, `consentimento` e `biometria`;
-  nÃ£o pode criar nem alterar tabelas. ExclusÃµes por retenÃ§Ã£o rodam com o papel de manutenÃ§Ã£o.
-- **AtenÃ§Ã£o com NULL em CHECK:** no PostgreSQL, um CHECK cujo resultado Ã© NULL Ã©
-  **aceito**. Por isso as constraints usam `IS NOT NULL` explicitamente (ver migraÃ§Ã£o 0008).
+  biometria sem consentimento **ativo da própria pessoa**. Biometria excluída tem o
+  template e o nonce apagados de fato, não só marcados.
+- **Menores de 18 anos:** o consentimento exige nome, CPF válido e parentesco do responsável.
+- **Termo imutável:** depois de publicado, o texto do termo não muda; o hash SHA-256
+  é conferido pelo banco. Para mudar o texto, publique uma nova versão.
+- **Foto facial:** a tabela `foto_facial` **não** foi criada. O padrão é guardar só o
+  template. Ela só será criada se o fabricante da catraca exigir a foto para gerar o template.
+- **Anonimização:** depois do prazo de retenção, a pessoa é anonimizada (CPF removido),
+  e não excluída, para que os eventos de acesso continuem consistentes.
+- **Permissões do papel `cadgestor_app`:** não pode apagar nem alterar `auditoria` e
+  `evento_acesso`; não pode apagar `pessoa`, `vinculo`, `consentimento` e `biometria`;
+  não pode criar nem alterar tabelas. Exclusões por retenção rodam com o papel de manutenção.
+- **Atenção com NULL em CHECK:** no PostgreSQL, um CHECK cujo resultado é NULL é
+  **aceito**. Por isso as constraints usam `IS NOT NULL` explicitamente (ver migração 0008).
 
-> **Base legal (validar com o jurÃ­dico):** todos os perfis nascem com
+> **Base legal (validar com o jurídico):** todos os perfis nascem com
 > `base_legal = 'consentimento'` e `base_legal_validada = false`. O banco exige
-> consentimento para **qualquer** biometria, como pede o escopo. Se o jurÃ­dico
+> consentimento para **qualquer** biometria, como pede o escopo. Se o jurídico
 > definir outra base legal para algum perfil (ex.: art. 11, II, "g" para
-> funcionÃ¡rios), serÃ¡ preciso uma migraÃ§Ã£o para ajustar essa trava.
+> funcionários), será preciso uma migração para ajustar essa trava.
 
 ## Roadmap
 
-- [x] Fase 0: estrutura, Composer, .env, conexÃ£o PDO, README
-- [x] Fase 1: migraÃ§Ãµes e seeds
-- [x] Fase 2: autenticaÃ§Ã£o, papÃ©is, CSRF, sessÃ£o
+- [x] Fase 0: estrutura, Composer, .env, conexão PDO, README
+- [x] Fase 1: migrações e seeds
+- [x] Fase 2: autenticação, papéis, CSRF, sessão
 - [x] Fase 3: empresas
 - [x] Fase 4: perfis e catracas
-- [x] Fase 5: pessoas, vÃ­nculos e regras de acesso
+- [x] Fase 5: pessoas, vínculos e regras de acesso
 - [x] Fase 6: consentimento LGPD e biometria cifrada
-- [x] Fase 7: API da catraca e motor de decisÃ£o
-- [x] Fase 8: relatÃ³rios, CSV e auditoria
-- [ ] Fase 9: jobs de manutenÃ§Ã£o, testes e revisÃ£o de seguranÃ§a
+- [x] Fase 7: API da catraca e motor de decisão
+- [x] Fase 8: relatórios, CSV e auditoria
+- [x] Fase 9: jobs de manutenção, testes e revisão de segurança

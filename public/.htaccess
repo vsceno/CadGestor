@@ -5,6 +5,10 @@ Require all granted
 Options -Indexes -MultiViews
 DirectoryIndex index.php
 
+# Limite do corpo da requisição (10 MB): foto facial vai até 5 MB; o resto é bem menor.
+# Evita que uploads gigantes (o php.ini do Laragon aceita 2 GB) consumam o servidor.
+LimitRequestBody 10485760
+
 # Repassa o cabeçalho Authorization (token das catracas) ao PHP.
 SetEnvIf Authorization "(.+)" HTTP_AUTHORIZATION=$1
 

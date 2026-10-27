@@ -72,9 +72,16 @@ final class Resposta
     {
         if (!headers_sent()) {
             http_response_code($this->status);
+            // Não anunciar a versão do PHP (facilita a vida de quem procura falhas conhecidas).
+            header_remove('X-Powered-By');
 
             foreach ($this->cabecalhos + $this->cabecalhosSeguranca() as $nome => $valor) {
                 header("{$nome}: {$valor}");
+            }
+
+            // Em HTTPS, o navegador passa a recusar HTTP para este domínio por 1 ano.
+            if (($_SERVER['HTTPS'] ?? '') === 'on' || ($_SERVER['SERVER_PORT'] ?? '') === '443') {
+                header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
             }
         }
 
