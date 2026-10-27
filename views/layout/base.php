@@ -20,6 +20,7 @@ $menu = [
     ['Painel', '/painel', []],
     ['Empresas', '/empresas', [Papel::CadastroEmpresa]],
     ['Catracas', '/catracas', [Papel::CadastroEmpresa]],
+    ['Pessoas', '/pessoas', [Papel::CadastroPessoa]],
     ['Perfis', '/perfis', [Papel::Administrador]],
     ['Usuários', '/usuarios', [Papel::Administrador]],
 ];

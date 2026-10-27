@@ -15,9 +15,11 @@ use CadGestor\Http\Controllers\EmpresaController;
 use CadGestor\Http\Controllers\InicioController;
 use CadGestor\Http\Controllers\PainelController;
 use CadGestor\Http\Controllers\PerfilController;
+use CadGestor\Http\Controllers\PessoaController;
 use CadGestor\Http\Controllers\RegraAcessoController;
 use CadGestor\Http\Controllers\SaudeController;
 use CadGestor\Http\Controllers\UsuarioController;
+use CadGestor\Http\Controllers\VinculoController;
 use CadGestor\Http\Middleware\ExigeAutenticacao;
 use CadGestor\Http\Middleware\ExigePapel;
 use CadGestor\Http\Middleware\IniciaSessao;
@@ -84,6 +86,22 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
                 $rotas->post('/catracas/{id}', $acao(CatracaController::class, 'atualizar'));
                 $rotas->post('/catracas/{id}/token', $acao(CatracaController::class, 'renovarToken'));
                 $rotas->post('/catracas/{id}/situacao', $acao(CatracaController::class, 'alterarSituacao'));
+            });
+
+            // --- Pessoas e vínculos (cadastro_pessoa) ----------------------
+            $rotas->grupo([$papel(Papel::CadastroPessoa)], static function (Roteador $rotas) use ($acao): void {
+                $rotas->get('/pessoas', $acao(PessoaController::class, 'index'));
+                $rotas->post('/pessoas/busca', $acao(PessoaController::class, 'index'));
+                $rotas->get('/pessoas/nova', $acao(PessoaController::class, 'novo'));
+                $rotas->post('/pessoas', $acao(PessoaController::class, 'criar'));
+                $rotas->get('/pessoas/{id}', $acao(PessoaController::class, 'ver'));
+                $rotas->get('/pessoas/{id}/editar', $acao(PessoaController::class, 'editar'));
+                $rotas->post('/pessoas/{id}', $acao(PessoaController::class, 'atualizar'));
+                $rotas->post('/pessoas/{id}/situacao', $acao(PessoaController::class, 'alterarSituacao'));
+                $rotas->post('/pessoas/{id}/vinculos', $acao(VinculoController::class, 'criar'));
+                $rotas->post('/vinculos/{id}', $acao(VinculoController::class, 'alterar'));
+                $rotas->get('/vinculos/{id}/regras', $acao(VinculoController::class, 'regras'));
+                $rotas->post('/vinculos/{id}/regras', $acao(VinculoController::class, 'salvarRegras'));
             });
 
             // --- Administração ---------------------------------------------

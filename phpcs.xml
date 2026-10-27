@@ -15,6 +15,11 @@
 
     <rule ref="PSR12"/>
 
+    <!-- Data providers em tabela ficam mais legíveis em uma linha. -->
+    <rule ref="Generic.Files.LineLength">
+        <exclude-pattern>tests/*</exclude-pattern>
+    </rule>
+
     <!-- funcoes.php declara helpers globais para as views (sem classe). -->
     <rule ref="PSR1.Files.SideEffects">
         <exclude-pattern>src/Nucleo/funcoes.php</exclude-pattern>

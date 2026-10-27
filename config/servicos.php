@@ -12,16 +12,20 @@ use CadGestor\Http\Controllers\EmpresaController;
 use CadGestor\Http\Controllers\InicioController;
 use CadGestor\Http\Controllers\PainelController;
 use CadGestor\Http\Controllers\PerfilController;
+use CadGestor\Http\Controllers\PessoaController;
 use CadGestor\Http\Controllers\RegraAcessoController;
 use CadGestor\Http\Controllers\SaudeController;
 use CadGestor\Http\Controllers\UsuarioController;
+use CadGestor\Http\Controllers\VinculoController;
 use CadGestor\Nucleo\Aplicacao;
 use CadGestor\Nucleo\Container;
 use CadGestor\Repositorios\CatracaRepositorio;
 use CadGestor\Repositorios\EmpresaRepositorio;
 use CadGestor\Repositorios\PerfilRepositorio;
+use CadGestor\Repositorios\PessoaRepositorio;
 use CadGestor\Repositorios\RegraAcessoRepositorio;
 use CadGestor\Repositorios\UsuarioRepositorio;
+use CadGestor\Repositorios\VinculoRepositorio;
 use CadGestor\Seguranca\Autenticacao;
 use CadGestor\Seguranca\Csrf;
 use CadGestor\Seguranca\HashSenha;
@@ -31,8 +35,11 @@ use CadGestor\Servicos\Auditoria;
 use CadGestor\Servicos\CatracaServico;
 use CadGestor\Servicos\EmpresaServico;
 use CadGestor\Servicos\PerfilServico;
+use CadGestor\Servicos\PessoaServico;
 use CadGestor\Servicos\RegraAcessoServico;
+use CadGestor\Servicos\SincronizacaoServico;
 use CadGestor\Servicos\UsuarioServico;
+use CadGestor\Servicos\VinculoServico;
 
 return static function (Container $c, Aplicacao $app): void {
     $pdo = static fn (): PDO => $app->banco->pdo();
@@ -64,7 +71,8 @@ return static function (Container $c, Aplicacao $app): void {
     foreach (
         [
             UsuarioRepositorio::class, EmpresaRepositorio::class, PerfilRepositorio::class,
-            CatracaRepositorio::class, RegraAcessoRepositorio::class,
+            CatracaRepositorio::class, RegraAcessoRepositorio::class, PessoaRepositorio::class,
+            VinculoRepositorio::class,
         ] as $repositorio
     ) {
         $c->registrar($repositorio, static fn (): object => new $repositorio($pdo()));
@@ -100,6 +108,20 @@ return static function (Container $c, Aplicacao $app): void {
         $c->obter(UsuarioRepositorio::class),
         $c->obter(HashSenha::class),
         $c->obter(Auditoria::class),
+    ));
+
+    $c->registrar(SincronizacaoServico::class, static fn (): SincronizacaoServico => new SincronizacaoServico($pdo()));
+    $c->registrar(PessoaServico::class, static fn (Container $c): PessoaServico => new PessoaServico(
+        $pdo(),
+        $c->obter(PessoaRepositorio::class),
+        $c->obter(Auditoria::class),
+    ));
+    $c->registrar(VinculoServico::class, static fn (Container $c): VinculoServico => new VinculoServico(
+        $pdo(),
+        $c->obter(VinculoRepositorio::class),
+        $c->obter(PessoaRepositorio::class),
+        $c->obter(Auditoria::class),
+        $c->obter(SincronizacaoServico::class),
     ));
 
     // --- Controllers -------------------------------------------------------
@@ -153,4 +175,18 @@ return static function (Container $c, Aplicacao $app): void {
             $c->obter(RegraAcessoRepositorio::class),
             $c->obter(RegraAcessoServico::class),
         ));
+    $c->registrar(PessoaController::class, static fn (Container $c): PessoaController => new PessoaController(
+        $c->obter(Sessao::class),
+        $c->obter(PessoaRepositorio::class),
+        $c->obter(VinculoRepositorio::class),
+        $c->obter(PessoaServico::class),
+    ));
+    $c->registrar(VinculoController::class, static fn (Container $c): VinculoController => new VinculoController(
+        $c->obter(Sessao::class),
+        $c->obter(VinculoRepositorio::class),
+        $c->obter(VinculoServico::class),
+        $c->obter(RegraAcessoRepositorio::class),
+        $c->obter(RegraAcessoServico::class),
+        $c->obter(CatracaRepositorio::class),
+    ));
 };
