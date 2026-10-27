@@ -1,0 +1,128 @@
+:root {
+    --cor-fundo: #f4f6f8;
+    --cor-superficie: #ffffff;
+    --cor-texto: #1f2933;
+    --cor-suave: #616e7c;
+    --cor-borda: #d9e2ec;
+    --cor-primaria: #1d4e89;
+    --cor-ok: #1b7a43;
+    --cor-ok-fundo: #e3f6ea;
+    --cor-falha: #b42318;
+    --cor-falha-fundo: #fde8e6;
+    --raio: 8px;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    background: var(--cor-fundo);
+    color: var(--cor-texto);
+    line-height: 1.5;
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+}
+
+a {
+    color: var(--cor-primaria);
+}
+
+.topo {
+    background: var(--cor-primaria);
+    padding: 0.75rem 1rem;
+}
+
+.marca {
+    color: #fff;
+    font-weight: 700;
+    font-size: 1.15rem;
+    text-decoration: none;
+}
+
+.conteudo {
+    flex: 1;
+    width: 100%;
+    max-width: 960px;
+    margin: 0 auto;
+    padding: 1.5rem 1rem;
+}
+
+.cartao {
+    background: var(--cor-superficie);
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio);
+    padding: 1.5rem;
+}
+
+.cartao h1 {
+    margin-top: 0;
+    font-size: 1.4rem;
+}
+
+.subtitulo,
+.nota {
+    color: var(--cor-suave);
+}
+
+.tabela {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+}
+
+.tabela th,
+.tabela td {
+    text-align: left;
+    padding: 0.5rem;
+    border-bottom: 1px solid var(--cor-borda);
+    vertical-align: top;
+}
+
+.tabela th {
+    font-size: 0.85rem;
+    color: var(--cor-suave);
+    text-transform: uppercase;
+}
+
+.selo {
+    display: inline-block;
+    padding: 0.1rem 0.5rem;
+    border-radius: 999px;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+
+.selo-ok {
+    background: var(--cor-ok-fundo);
+    color: var(--cor-ok);
+}
+
+.selo-falha {
+    background: var(--cor-falha-fundo);
+    color: var(--cor-falha);
+}
+
+.trace {
+    overflow-x: auto;
+    font-size: 0.8rem;
+    background: var(--cor-fundo);
+    padding: 1rem;
+}
+
+.rodape {
+    text-align: center;
+    color: var(--cor-suave);
+    font-size: 0.8rem;
+    padding: 1rem;
+}
+
+@media (max-width: 600px) {
+    .tabela th:nth-child(3),
+    .tabela td:nth-child(3) {
+        display: none;
+    }
+}

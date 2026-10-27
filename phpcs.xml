@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<ruleset name="CadGestor">
+    <description>Padrão de código do CadGestor (PSR-12).</description>
+
+    <file>src</file>
+    <file>config</file>
+    <file>public/index.php</file>
+    <file>tests</file>
+
+    <arg name="extensions" value="php"/>
+    <arg name="colors"/>
+    <arg name="cache" value=".phpcs-cache"/>
+    <arg value="sp"/>
+
+    <rule ref="PSR12"/>
+
+    <!-- funcoes.php declara helpers globais para as views (sem classe). -->
+    <rule ref="PSR1.Files.SideEffects">
+        <exclude-pattern>src/Nucleo/funcoes.php</exclude-pattern>
+    </rule>
+</ruleset>

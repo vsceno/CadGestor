@@ -1,0 +1,4 @@
+# Raiz do projeto: NADA aqui deve ser servido pela web (.env, vendor, src, storage...).
+# O virtual host aponta para public/, que reabre o acesso com o próprio .htaccess.
+# Esta regra é uma segunda trava caso algum vhost aponte para a raiz por engano.
+Require all denied

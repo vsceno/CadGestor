@@ -1,0 +1,23 @@
+# Pasta pública: única exposta pelo Apache.
+# Reabre o acesso que o .htaccess da raiz do projeto bloqueia.
+Require all granted
+
+Options -Indexes -MultiViews
+DirectoryIndex index.php
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Arquivos e pastas reais (css, js, imagens) são servidos diretamente.
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # Todo o resto vai para o front controller.
+    RewriteRule ^ index.php [L]
+</IfModule>
+
+# Arquivos ocultos (.htaccess, .git etc.) nunca são servidos.
+<FilesMatch "^\.">
+    Require all denied
+</FilesMatch>
