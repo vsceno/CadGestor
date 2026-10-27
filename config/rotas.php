@@ -9,6 +9,8 @@
 
 declare(strict_types=1);
 
+use CadGestor\Http\Controllers\AlertaController;
+use CadGestor\Http\Controllers\ApiCatracaController;
 use CadGestor\Http\Controllers\AutenticacaoController;
 use CadGestor\Http\Controllers\CatracaController;
 use CadGestor\Http\Controllers\EmpresaController;
@@ -19,6 +21,7 @@ use CadGestor\Http\Controllers\PerfilController;
 use CadGestor\Http\Controllers\PessoaController;
 use CadGestor\Http\Controllers\RegraAcessoController;
 use CadGestor\Http\Controllers\SaudeController;
+use CadGestor\Http\Controllers\SimuladorController;
 use CadGestor\Http\Controllers\UsuarioController;
 use CadGestor\Http\Controllers\VinculoController;
 use CadGestor\Http\Middleware\ExigeAutenticacao;
@@ -30,6 +33,7 @@ use CadGestor\Nucleo\Aplicacao;
 use CadGestor\Nucleo\Container;
 use CadGestor\Nucleo\Resposta;
 use CadGestor\Nucleo\Roteador;
+use CadGestor\Nucleo\Visao;
 use CadGestor\Seguranca\Autenticacao;
 use CadGestor\Seguranca\Csrf;
 use CadGestor\Seguranca\Papel;
@@ -54,6 +58,13 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
     // --- Públicas, sem sessão ---------------------------------------------
     $rotas->get('/saude', $acao(SaudeController::class, 'verificar'));
 
+    // --- API das catracas: sem sessão/CSRF; autenticação por token do dispositivo
+    $rotas->post('/api/v1/acesso', $acao(ApiCatracaController::class, 'acesso'));
+    $rotas->get('/api/v1/configuracao', $acao(ApiCatracaController::class, 'configuracao'));
+    $rotas->get('/api/v1/sincronizacao', $acao(ApiCatracaController::class, 'sincronizacao'));
+    $rotas->post('/api/v1/sincronizacao/{id}', $acao(ApiCatracaController::class, 'confirmarSincronizacao'));
+    $rotas->post('/api/v1/eventos-offline', $acao(ApiCatracaController::class, 'eventosOffline'));
+
     // --- Web (com sessão e CSRF) ------------------------------------------
     $rotas->grupo([$sessao, $csrf], static function (Roteador $rotas) use ($acao, $logado, $papel, $app): void {
         $rotas->get('/', static fn (): Resposta => Resposta::redirecionar('/painel'));
@@ -65,6 +76,14 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
             $rotas->get('/senha', $acao(AutenticacaoController::class, 'formularioSenha'));
             $rotas->post('/senha', $acao(AutenticacaoController::class, 'trocarSenha'));
             $rotas->get('/painel', $acao(PainelController::class, 'index'));
+
+            // --- Alertas: consulta vê, administrador trata ------------------
+            $rotas->get('/alertas', $acao(AlertaController::class, 'index'), [$papel(Papel::Consulta)]);
+            $rotas->post(
+                '/alertas/{id}/tratar',
+                $acao(AlertaController::class, 'tratar'),
+                [$papel(Papel::Administrador)],
+            );
 
             // --- Empresas, catracas e regras (cadastro_empresa) -----------
             $rotas->grupo([$papel(Papel::CadastroEmpresa)], static function (Roteador $rotas) use ($acao): void {
@@ -138,6 +157,9 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
                 // Diagnóstico técnico: só fora de produção.
                 if (!$app->ambiente->emProducao()) {
                     $rotas->get('/diagnostico', $acao(InicioController::class, 'index'));
+                    $rotas->get('/simulador', $acao(SimuladorController::class, 'index'));
+                    $rotas->post('/simulador', $acao(SimuladorController::class, 'simular'));
+                    Visao::compartilhar(['simulador_disponivel' => true]);
                 }
             });
         });

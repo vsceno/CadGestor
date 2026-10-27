@@ -327,6 +327,60 @@ php bin/gerar-chave.php --rotacionar   # nova versão de chave (as antigas conti
   `IdentificadorSimulado`. Adaptadores de fabricantes entram em
   `src/Biometria/Adaptadores` (veja o LEIA-ME); **nenhum SDK foi suposto**.
 
+### API das catracas e decisão de acesso (Fase 7)
+
+Todas as rotas exigem `Authorization: Bearer <token da catraca>` e trocam JSON. Elas
+**não usam sessão nem cookie**. Em produção, use **somente HTTPS**, porque o
+`/sincronizacao` entrega templates decifrados ao dispositivo dono da operação.
+
+| Método e rota | Uso |
+|---|---|
+| `POST /api/v1/acesso` | Pedido de passagem. Retorna `{"decisao":"liberado"\|"negado","motivo":...,"evento_id":...,"data_hora":...}` |
+| `GET /api/v1/configuracao` | Modo de falha, tipo de identificação, limiar, fuso e hora do servidor |
+| `GET /api/v1/sincronizacao` | Próximas operações `cadastrar`/`remover` da catraca (com template em base64 quando for cadastrar) |
+| `POST /api/v1/sincronizacao/{id}` | Confirma a operação: `{"sucesso":true}` ou `{"sucesso":false,"erro":"..."}`. Falhas são reagendadas com atraso crescente; depois de 5 tentativas, viram alerta |
+| `POST /api/v1/eventos-offline` | Eventos decididos sem servidor: `{"eventos":[{"tipo","referencia","resultado","data_hora"}]}`. Aceita até 30 dias para trás e até 500 por envio |
+
+**Corpo do `/acesso`**: há dois modos, porque depende do fabricante (ponto em aberto).
+
+```jsonc
+// 1) O dispositivo reconheceu a pessoa (1:N ou 1:1 no hardware)
+{ "tipo": "digital", "referencia": "<uuid da pessoa no dispositivo>", "score": 0.93 }
+// 2) O servidor identifica (1:N) a partir da amostra capturada
+{ "tipo": "facial", "amostra": "<base64>" }
+```
+
+A resposta traz só a decisão e o motivo técnico, sem nome, CPF ou qualquer outro
+dado pessoal. A `referencia` é o UUID da pessoa, que não identifica ninguém fora do sistema.
+
+**`DecisaoAcesso`** (`src/Acesso/DecisaoAcesso.php`) verifica, nesta ordem, e para na
+primeira falha:
+
+1. Catraca existe e está ativa, e a empresa dela também → `catraca_inexistente` ou `catraca_inativa`
+2. Pessoa identificada, existente e ativa → `pessoa_nao_identificada` ou `pessoa_inativa`
+3. Vínculo **vigente** com a empresa da catraca → `sem_vinculo_ativo`
+4. Perfil aceito pela empresa e ativo → `perfil_nao_permitido`
+5. Regra para o dia, a hora e a catraca, no fuso `APP_FUSO` (vínculo > perfil > horário padrão) → `fora_do_horario`
+6. Confiança ≥ `LIMIAR_CONFIANCA` e biometria ativa com consentimento → `biometria_nao_confere`
+
+Todo pedido gera um `evento_acesso`. Toda negação gera um **alerta**, e 3 ou mais
+negações em 2 minutos na mesma catraca geram um alerta de *tentativas repetidas*.
+Um token desconhecido gera evento, alerta de *dispositivo desconhecido* e resposta 401,
+com limite de registros para não lotar as tabelas. Na identificação feita pelo servidor,
+um candidato com confiança abaixo de 0,30 é tratado como "ninguém reconhecido", para não
+atribuir o evento à pessoa errada.
+
+**Simulador** (`/simulador`, administrador, só fora de produção): usa o mesmo motor da
+API, sem token, para testar regras e motivos pelo navegador.
+
+Exemplo com `curl`:
+
+```bash
+curl -X POST http://cadgestor.test/api/v1/acesso \
+  -H "Authorization: Bearer cgt_<64 hex>" -H "Content-Type: application/json" \
+  -d "{\"tipo\":\"digital\",\"referencia\":\"<uuid>\",\"score\":0.95}"
+```
+
 ### Modelo de dados (Fase 1)
 
 | Grupo | Tabelas |
@@ -377,6 +431,6 @@ php bin/gerar-chave.php --rotacionar   # nova versão de chave (as antigas conti
 - [x] Fase 4: perfis e catracas
 - [x] Fase 5: pessoas, vÃ­nculos e regras de acesso
 - [x] Fase 6: consentimento LGPD e biometria cifrada
-- [ ] Fase 7: API da catraca e motor de decisÃ£o
+- [x] Fase 7: API da catraca e motor de decisÃ£o
 - [ ] Fase 8: relatÃ³rios, CSV e auditoria
 - [ ] Fase 9: jobs de manutenÃ§Ã£o, testes e revisÃ£o de seguranÃ§a

@@ -21,10 +21,15 @@ $menu = [
     ['Empresas', '/empresas', [Papel::CadastroEmpresa]],
     ['Catracas', '/catracas', [Papel::CadastroEmpresa]],
     ['Pessoas', '/pessoas', [Papel::CadastroPessoa]],
+    ['Alertas', '/alertas', [Papel::Consulta]],
     ['Perfis', '/perfis', [Papel::Administrador]],
     ['Termos LGPD', '/termos', [Papel::Administrador]],
     ['Usuários', '/usuarios', [Papel::Administrador]],
 ];
+
+if (\CadGestor\Nucleo\Visao::compartilhado('simulador_disponivel', false)) {
+    $menu[] = ['Simulador', '/simulador', [Papel::Administrador]];
+}
 
 $itensVisiveis = $usuario === null || $usuario->deveTrocarSenha ? [] : array_filter(
     $menu,

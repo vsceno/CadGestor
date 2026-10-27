@@ -6,6 +6,8 @@
 
 declare(strict_types=1);
 
+use CadGestor\Http\Controllers\AlertaController;
+use CadGestor\Http\Controllers\ApiCatracaController;
 use CadGestor\Http\Controllers\AutenticacaoController;
 use CadGestor\Http\Controllers\CatracaController;
 use CadGestor\Http\Controllers\EmpresaController;
@@ -16,18 +18,24 @@ use CadGestor\Http\Controllers\PerfilController;
 use CadGestor\Http\Controllers\PessoaController;
 use CadGestor\Http\Controllers\RegraAcessoController;
 use CadGestor\Http\Controllers\SaudeController;
+use CadGestor\Http\Controllers\SimuladorController;
 use CadGestor\Http\Controllers\UsuarioController;
 use CadGestor\Http\Controllers\VinculoController;
 use CadGestor\Nucleo\Aplicacao;
 use CadGestor\Nucleo\Container;
 use CadGestor\Repositorios\CatracaRepositorio;
 use CadGestor\Repositorios\EmpresaRepositorio;
+use CadGestor\Repositorios\EventoRepositorio;
 use CadGestor\Repositorios\LgpdRepositorio;
 use CadGestor\Repositorios\PerfilRepositorio;
 use CadGestor\Repositorios\PessoaRepositorio;
 use CadGestor\Repositorios\RegraAcessoRepositorio;
 use CadGestor\Repositorios\UsuarioRepositorio;
 use CadGestor\Repositorios\VinculoRepositorio;
+use CadGestor\Acesso\AcessoServico;
+use CadGestor\Acesso\DecisaoAcesso;
+use CadGestor\Acesso\FonteDadosAcessoPdo;
+use CadGestor\Acesso\SincronizacaoDispositivo;
 use CadGestor\Biometria\IdentificadorBiometrico;
 use CadGestor\Biometria\IdentificadorSimulado;
 use CadGestor\Seguranca\Autenticacao;
@@ -79,7 +87,7 @@ return static function (Container $c, Aplicacao $app): void {
         [
             UsuarioRepositorio::class, EmpresaRepositorio::class, PerfilRepositorio::class,
             CatracaRepositorio::class, RegraAcessoRepositorio::class, PessoaRepositorio::class,
-            VinculoRepositorio::class, LgpdRepositorio::class,
+            VinculoRepositorio::class, LgpdRepositorio::class, EventoRepositorio::class,
         ] as $repositorio
     ) {
         $c->registrar($repositorio, static fn (): object => new $repositorio($pdo()));
@@ -163,6 +171,22 @@ return static function (Container $c, Aplicacao $app): void {
         $c->obter(SincronizacaoServico::class),
     ));
 
+    // --- Acesso (catracas) ----------------------------------------------------
+    $c->registrar(DecisaoAcesso::class, static fn (): DecisaoAcesso => new DecisaoAcesso(
+        new FonteDadosAcessoPdo($pdo()),
+        (float) $ambiente->texto('LIMIAR_CONFIANCA', '0.80'),
+    ));
+    $c->registrar(AcessoServico::class, static fn (Container $c): AcessoServico => new AcessoServico(
+        $pdo(),
+        $c->obter(DecisaoAcesso::class),
+        $c->obter(LgpdRepositorio::class),
+        $c->obter(IdentificadorBiometrico::class),
+        $c->obter(CifradorBiometria::class),
+        new DateTimeZone($ambiente->texto('APP_FUSO')),
+    ));
+    $c->registrar(SincronizacaoDispositivo::class, static fn (Container $c): SincronizacaoDispositivo =>
+        new SincronizacaoDispositivo($pdo(), $c->obter(CifradorBiometria::class)));
+
     // --- Controllers -------------------------------------------------------
     $c->registrar(SaudeController::class, static fn (): SaudeController => new SaudeController($app->banco, $app->log));
     $c->registrar(InicioController::class, static fn (): InicioController => new InicioController(
@@ -235,5 +259,26 @@ return static function (Container $c, Aplicacao $app): void {
         $c->obter(ConsentimentoServico::class),
         $c->obter(BiometriaServico::class),
         $c->obter(IdentificadorBiometrico::class),
+    ));
+    $c->registrar(ApiCatracaController::class, static fn (Container $c): ApiCatracaController =>
+        new ApiCatracaController(
+            $c->obter(CatracaRepositorio::class),
+            $c->obter(AcessoServico::class),
+            $c->obter(SincronizacaoDispositivo::class),
+            (float) $ambiente->texto('LIMIAR_CONFIANCA', '0.80'),
+            $ambiente->texto('APP_FUSO'),
+        ));
+    $c->registrar(AlertaController::class, static fn (Container $c): AlertaController => new AlertaController(
+        $c->obter(Sessao::class),
+        $c->obter(EventoRepositorio::class),
+        $c->obter(Autenticacao::class),
+        $c->obter(Auditoria::class),
+    ));
+    $c->registrar(SimuladorController::class, static fn (Container $c): SimuladorController => new SimuladorController(
+        $c->obter(Sessao::class),
+        $pdo(),
+        $c->obter(CatracaRepositorio::class),
+        $c->obter(EventoRepositorio::class),
+        $c->obter(AcessoServico::class),
     ));
 };

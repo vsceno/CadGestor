@@ -5,6 +5,9 @@ Require all granted
 Options -Indexes -MultiViews
 DirectoryIndex index.php
 
+# Repassa o cabeçalho Authorization (token das catracas) ao PHP.
+SetEnvIf Authorization "(.+)" HTTP_AUTHORIZATION=$1
+
 <IfModule mod_rewrite.c>
     RewriteEngine On
 
