@@ -69,6 +69,14 @@ $itensVisiveis = $usuario === null || $usuario->deveTrocarSenha ? [] : array_fil
     static fn (array $item): bool => $item[3] === [] || $usuario->temPapel(...$item[3]),
 );
 $situacaoAssinatura = Visao::compartilhado('situacao_assinatura');
+
+// Versão no endereço do CSS/JS (data de alteração do arquivo): quando o arquivo muda,
+// o navegador baixa o novo em vez de reaproveitar a cópia antiga do cache.
+$recurso = static function (string $caminho): string {
+    $arquivo = dirname(__DIR__, 2) . '/public' . $caminho;
+
+    return is_file($arquivo) ? $caminho . '?v=' . filemtime($arquivo) : $caminho;
+};
 ?>
 <!doctype html>
 <html lang="pt-BR">
@@ -77,8 +85,8 @@ $situacaoAssinatura = Visao::compartilhado('situacao_assinatura');
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="color-scheme" content="light">
     <title><?= e($titulo ?? 'CadGestor') ?> · CadGestor</title>
-    <link rel="stylesheet" href="/assets/css/app.css">
-    <script src="/assets/js/app.js" defer></script>
+    <link rel="stylesheet" href="<?= e($recurso('/assets/css/app.css')) ?>">
+    <script src="<?= e($recurso('/assets/js/app.js')) ?>" defer></script>
 </head>
 <?php if ($usuario === null) : ?>
 <body class="pagina-publica">
