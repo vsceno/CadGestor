@@ -14,6 +14,7 @@
     'vazio' => 'Selecione',
     'ajuda' => null,
     'obrigatorio' => false,
+    'semOpcional' => false,
     'id' => null,
 ])
 
@@ -28,7 +29,7 @@
 <div {{ $attributes->only('class')->merge(['class' => 'flex flex-col gap-1.5']) }}>
     <label for="{{ $id }}" class="text-sm font-medium text-texto">
         {{ $rotulo }}
-        @unless ($obrigatorio)<span class="font-normal text-suave">(opcional)</span>@endunless
+        @unless ($obrigatorio || $semOpcional)<span class="font-normal text-suave">(opcional)</span>@endunless
     </label>
 
     <select id="{{ $id }}" name="{{ $nome }}"

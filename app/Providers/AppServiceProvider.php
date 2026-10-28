@@ -7,6 +7,7 @@ use App\Models\Usuario;
 use App\Support\ContextoBanco;
 use App\Support\Navegacao;
 use App\Support\PreferenciasInterface;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
@@ -27,6 +28,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Fora de produção, campo descartado em silêncio (não preenchível) vira erro: bug não passa despercebido.
+        Model::preventSilentlyDiscardingAttributes(! $this->app->isProduction());
+
         Auth::provider('cadgestor', fn ($app): ProvedorUsuarios => new ProvedorUsuarios(
             $app['hash'],
             $app->make(ContextoBanco::class),

@@ -29,13 +29,17 @@ abstract class TestCase extends BaseTestCase
     }
 
     /**
-     * Cria um cliente (organização) já provisionado, como a plataforma faz.
-     * Devolve o id. O contexto volta a ficar vazio.
+     * Cria um cliente (organização) já provisionado e com assinatura ativa,
+     * como a plataforma faz. Devolve o id. O contexto volta a ficar vazio.
      */
-    protected function criarCliente(string $nome = 'Cliente de teste'): string
+    protected function criarCliente(string $nome = 'Cliente de teste', string $plano = 'profissional'): string
     {
         $this->contexto()->definir(null, null, true);
         $id = (string) DB::connection('pgsql')->scalar('INSERT INTO organizacao (nome) VALUES (?) RETURNING id', [$nome]);
+        DB::connection('pgsql')->insert(
+            "INSERT INTO assinatura (organizacao_id, plano_id, status) SELECT ?, id, 'ativa' FROM plano WHERE codigo = ?",
+            [$id, $plano],
+        );
         $this->contexto()->definir($id);
         DB::connection('pgsql')->select('SELECT cg_provisionar_organizacao(?)', [$id]);
         $this->contexto()->limpar();

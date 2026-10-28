@@ -32,12 +32,6 @@ class Usuario extends Authenticatable
     /** @var list<string> */
     protected $hidden = ['senha_hash', 'verificacao_token_hash', 'redefinicao_token_hash'];
 
-    /** O banco gera o id (uuidv7); o Laravel não precisa inventar um. */
-    public function newUniqueId(): ?string
-    {
-        return null;
-    }
-
     /** @return array<string, string> */
     protected function casts(): array
     {

@@ -183,6 +183,17 @@
                 </div>
             </header>
 
+            {{-- Avisos da assinatura (atraso, fim do teste, limite do plano), em todas as telas do cliente. --}}
+            @foreach ($faixas ?? [] as $faixa)
+                <div class="flex items-center gap-2 border-b border-atencao/30 bg-atencao-suave px-4 py-2.5 text-sm text-texto lg:px-8" role="status">
+                    <x-icone nome="atencao" class="size-4 text-atencao" />
+                    <span class="flex-1">{{ $faixa }}</span>
+                    @if (Route::has('assinatura.index') && ! request()->routeIs('assinatura.*'))
+                        <a href="{{ route('assinatura.index') }}" class="font-semibold whitespace-nowrap">Minha assinatura</a>
+                    @endif
+                </div>
+            @endforeach
+
             <main id="conteudo" class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 pb-24 lg:px-8 lg:pb-8">
                 <x-mensagens-sessao />
                 {{ $mensagens ?? '' }}

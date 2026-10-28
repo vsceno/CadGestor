@@ -4,11 +4,13 @@ use App\Http\Middleware\CabecalhosSeguranca;
 use App\Http\Middleware\DefinirContextoBanco;
 use App\Http\Middleware\ExigePapel;
 use App\Http\Middleware\ExigeTrocaSenha;
+use App\Http\Middleware\VerificaAssinatura;
 use App\Support\PreferenciasInterface;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Middleware\SubstituteBindings;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -21,6 +23,8 @@ return Application::configure(basePath: dirname(__DIR__))
 
         // Isolamento entre clientes: o banco só enxerga o cliente do usuário logado.
         $middleware->web(append: [DefinirContextoBanco::class]);
+        // Antes de buscar os modelos da URL (route binding): sem contexto, o RLS esconderia o registro.
+        $middleware->prependToPriorityList(before: SubstituteBindings::class, prepend: DefinirContextoBanco::class);
 
         // Preferências de interface (tema e menu recolhido), gravadas pelo JavaScript.
         // Não contêm dado pessoal; por isso não passam pela cifra de cookies.
@@ -29,6 +33,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'papel' => ExigePapel::class,
             'troca.senha' => ExigeTrocaSenha::class,
+            'assinatura' => VerificaAssinatura::class,
         ]);
 
         $middleware->redirectGuestsTo(fn () => route('entrar'));
