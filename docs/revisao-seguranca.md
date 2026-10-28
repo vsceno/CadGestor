@@ -23,6 +23,7 @@ Data: 27/10/2026 · Escopo: código da `main` após a Fase 9.
 | Controle de acesso por papel em cada rota | ✅ Middlewares por grupo de rotas | `config/rotas.php`, `ExigePapel` |
 | Logs sem dados pessoais; sem stack trace em produção | ✅ O log guarda só classe, arquivo, linha e referência | `TratadorErros`, `Log` |
 | Sem dados pessoais em URLs | ✅ Parâmetros só UUID; busca por POST | `Roteador`, `PessoaController` |
+| Isolamento entre organizações (multi-tenant) | ✅ RLS, FKs compostas e trigger de organização fixa; ver item 2.10 | migração 0010, `ContextoBanco` |
 
 ## 2. Verificações executadas
 
@@ -73,6 +74,24 @@ Proteção contra injeção de fórmula (`= + - @` e tabulação) em `Nucleo\Csv
 CSP restritiva, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissions-Policy`
 (câmera só no próprio site), `Cache-Control: no-store` nas páginas internas, HSTS em HTTPS.
 `X-Powered-By` é removido pela aplicação.
+
+### 2.10 Multi-tenant (migração 0010)
+- RLS em todas as tabelas de organização. O contexto vem do servidor (sessão ou token da catraca), nunca da requisição.
+- Sem contexto, nada aparece (falha fechada).
+- FKs compostas `(organizacao_id, id)` impedem referenciar registros de outro cliente, mesmo com o UUID conhecido.
+- O trigger `impedir_troca_organizacao` bloqueia a mudança de organização de qualquer registro.
+- O papel `plataforma` é exclusivo de usuários sem organização (trigger `verificar_papel_usuario`).
+- Funções `SECURITY DEFINER` com `search_path` fixo, executáveis só por `cadgestor_app`, devolvendo apenas identificadores ou contagens.
+- `cg_resumo_organizacoes` exige o modo plataforma.
+- `cg_provisionar_organizacao` não pode ser usada por uma organização para alterar outra.
+- Teste no navegador: um administrador do cliente B, usando os UUIDs reais de empresa e pessoa do cliente A, recebeu 404 em todas as leituras. Nenhuma escrita teve efeito (conferido no banco).
+- Cobertura automatizada: `IsolamentoOrganizacaoTest` (conexão real da aplicação, sujeita ao RLS), `AutenticacaoTest` e `OrganizacaoServicoTest`.
+- Corrigido junto: "registro não encontrado" vindo de um serviço passou a responder 404 em vez de 500 (`Aplicacao::atender`).
+
+**Riscos residuais:**
+- O papel dono (`cadgestor_owner`) ignora o RLS. Os jobs filtram por organização no código e precisam de cuidado ao evoluir.
+- O modo suporte dá à plataforma acesso aos dados pessoais do cliente. Ele é auditado, mas o contrato com o cliente deve prever esse acesso (operador x controlador, LGPD art. 39).
+- `/diagnostico` (só fora de produção) mostra contagens de linhas das tabelas do sistema todo, com base em estatísticas do PostgreSQL.
 
 ## 3. Correções feitas nesta revisão
 

@@ -115,6 +115,29 @@ code {
     font-weight: 600;
 }
 
+.conta-organizacao {
+    background: var(--cor-primaria-escura);
+    border-radius: 999px;
+    padding: 0.15rem 0.65rem;
+    max-width: 16rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* Modo suporte: a plataforma está dentro de uma organização. */
+.faixa-suporte {
+    background: var(--cor-aviso-fundo);
+    color: var(--cor-aviso);
+    border-bottom: 1px solid var(--cor-borda);
+    padding: 0.5rem 1rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem 1rem;
+}
+
 /* --- Estrutura --------------------------------------------------------- */
 .conteudo {
     flex: 1;

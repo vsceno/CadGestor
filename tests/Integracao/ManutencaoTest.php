@@ -135,6 +135,33 @@ final class ManutencaoTest extends BancoTestCase
         self::assertSame(0, $this->manutencao->executar(['catracas'], new DateTimeImmutable())['catracas_sem_contato']);
     }
 
+    public function testJobSemContextoGravaNaOrganizacaoDoRegistro(): void
+    {
+        $pessoa = $this->criarPessoa();
+        $vinculo = $this->vinculo($pessoa, '2026-01-01', '2026-03-31');
+        $this->pdo->exec("UPDATE catraca SET ultimo_contato_em = now() - interval '2 hours'");
+
+        // O job real roda sem organização no contexto, com o papel dono.
+        self::usarOrganizacao($this->pdo, null);
+        $this->manutencao->executar(['vinculos', 'catracas'], new DateTimeImmutable('2026-04-01'));
+
+        $org = self::organizacaoTeste();
+        self::assertSame($org, $this->valor('SELECT organizacao_id FROM fila_sincronizacao WHERE pessoa_id = :id', $pessoa));
+        self::assertSame($org, $this->valor(
+            "SELECT organizacao_id FROM auditoria WHERE registro_id = :id AND acao = 'job_manutencao'",
+            $vinculo,
+        ));
+        self::assertSame($org, $this->valor(
+            "SELECT a.organizacao_id FROM alerta a JOIN catraca c ON c.id = a.catraca_id WHERE c.empresa_id = :id",
+            $this->empresa,
+        ));
+
+        // O resumo do job é da plataforma (sem organização).
+        self::assertSame(1, (int) $this->pdo->query(
+            "SELECT count(*) FROM auditoria WHERE acao = 'job_manutencao' AND registro_id IS NULL AND organizacao_id IS NULL"
+        )->fetchColumn());
+    }
+
     private function vinculo(string $pessoa, string $inicio, ?string $fim, string $status = 'ativo'): string
     {
         return $this->inserir(<<<'SQL'

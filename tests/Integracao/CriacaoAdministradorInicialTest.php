@@ -34,12 +34,12 @@ final class CriacaoAdministradorInicialTest extends BancoTestCase
         $this->pdo->exec('DELETE FROM usuario_sistema');
     }
 
-    public function testCriaAdministradorComSenhaArgon2idETrocaObrigatoria(): void
+    public function testCriaAdministradorDaPlataformaComSenhaArgon2idETrocaObrigatoria(): void
     {
         $resultado = $this->servico->criar('  Maria   Souza ', 'Maria@Exemplo.COM');
 
         $consulta = $this->pdo->prepare(<<<'SQL'
-            SELECT u.nome, u.email, u.senha_hash, u.deve_trocar_senha, p.papel
+            SELECT u.nome, u.email, u.senha_hash, u.deve_trocar_senha, u.organizacao_id, p.papel
               FROM usuario_sistema u JOIN usuario_papel p ON p.usuario_id = u.id
              WHERE u.id = :id
             SQL);
@@ -49,7 +49,8 @@ final class CriacaoAdministradorInicialTest extends BancoTestCase
         self::assertSame('Maria Souza', $usuario['nome']);
         self::assertSame('maria@exemplo.com', $usuario['email']);
         self::assertTrue($usuario['deve_trocar_senha']);
-        self::assertSame('administrador', $usuario['papel']);
+        self::assertSame('plataforma', $usuario['papel']);
+        self::assertNull($usuario['organizacao_id'], 'Usuário da plataforma não pertence a organização.');
         self::assertStringStartsWith('$argon2id$', $usuario['senha_hash']);
         self::assertTrue(password_verify($resultado['senha'], $usuario['senha_hash']));
         self::assertGreaterThanOrEqual(HashSenha::TAMANHO_MINIMO, strlen($resultado['senha']));
@@ -65,7 +66,7 @@ final class CriacaoAdministradorInicialTest extends BancoTestCase
         $consulta->execute(['id' => $resultado['id']]);
         $dados = (string) $consulta->fetchColumn();
 
-        self::assertStringContainsString('administrador', $dados);
+        self::assertStringContainsString('plataforma', $dados);
         self::assertStringNotContainsString('maria', $dados);
     }
 

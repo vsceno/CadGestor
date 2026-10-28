@@ -3,6 +3,7 @@
  * @var string $titulo
  * @var string $senha
  * @var string $emailUsuario
+ * @var string|null $voltarPara
  */
 ?>
 <section class="cartao cartao-estreito">
@@ -19,6 +20,6 @@
 
     <div class="acoes">
         <button type="button" class="botao" data-copiar="senha-provisoria">Copiar senha</button>
-        <a href="/usuarios" class="botao botao-primario">Concluir</a>
+        <a href="<?= e($voltarPara ?? '/usuarios') ?>" class="botao botao-primario">Concluir</a>
     </div>
 </section>

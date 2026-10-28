@@ -1,7 +1,8 @@
 <?php
 
 /**
- * Cria o administrador inicial. A senha é gerada e exibida UMA vez.
+ * Cria o administrador inicial da PLATAFORMA (cadastra organizações e os
+ * administradores de cada uma). A senha é gerada e exibida UMA vez.
  *
  * Uso: php bin/criar-admin.php --nome="Maria Souza" --email=maria@empresa.com.br
  */
@@ -28,7 +29,7 @@ $resultado = $servico->criar($opcoes['nome'], $opcoes['email']);
 
 echo <<<TXT
 
-    Administrador criado.
+    Administrador da plataforma criado.
 
       E-mail: {$opcoes['email']}
       Senha provisória: {$resultado['senha']}

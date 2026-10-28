@@ -16,13 +16,22 @@ final class UsuarioRepositorio
     {
     }
 
-    /** @return array<string, mixed>|null */
-    public function buscarPorEmail(string $email): ?array
+    /**
+     * Login: localiza a conta pelo e-mail em qualquer organização (antes do
+     * login ainda não se sabe qual é a organização, e o RLS esconderia a linha).
+     *
+     * @return array{usuario_id: string, organizacao_id: ?string}|null
+     */
+    public function localizarParaLogin(string $email): ?array
     {
-        $consulta = $this->pdo->prepare('SELECT * FROM usuario_sistema WHERE lower(email) = lower(:email)');
+        $consulta = $this->pdo->prepare('SELECT usuario_id, organizacao_id FROM cg_login_usuario(:email)');
         $consulta->execute(['email' => $email]);
+        $conta = $consulta->fetch(PDO::FETCH_ASSOC);
 
-        return $consulta->fetch(PDO::FETCH_ASSOC) ?: null;
+        return $conta === false ? null : [
+            'usuario_id' => (string) $conta['usuario_id'],
+            'organizacao_id' => $conta['organizacao_id'] === null ? null : (string) $conta['organizacao_id'],
+        ];
     }
 
     /** @return array<string, mixed>|null */
@@ -50,27 +59,35 @@ final class UsuarioRepositorio
         return array_map('strval', $consulta->fetchAll(PDO::FETCH_COLUMN));
     }
 
-    /** @return list<array<string, mixed>> */
-    public function listar(): array
+    /**
+     * Usuários de uma organização: a informada (modo plataforma) ou a do
+     * contexto atual. Usuários da plataforma nunca aparecem nesta lista.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function listar(?string $organizacaoId = null): array
     {
-        return $this->pdo->query(<<<'SQL'
+        $consulta = $this->pdo->prepare(<<<'SQL'
             SELECT u.id, u.nome, u.email, u.ativo, u.deve_trocar_senha, u.ultimo_login_em,
                    COALESCE(array_to_string(array_agg(p.papel ORDER BY p.papel), ','), '') AS papeis
               FROM usuario_sistema u
               LEFT JOIN usuario_papel p ON p.usuario_id = u.id
+             WHERE u.organizacao_id = COALESCE(CAST(:organizacao AS uuid), cg_org_atual())
              GROUP BY u.id
              ORDER BY u.ativo DESC, u.nome
-            SQL)->fetchAll(PDO::FETCH_ASSOC);
+            SQL);
+        $consulta->execute(['organizacao' => $organizacaoId]);
+
+        return $consulta->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /** O e-mail é único no sistema todo (o login é só por e-mail), não só na organização. */
     public function emailEmUso(string $email, ?string $excetoId = null): bool
     {
-        $consulta = $this->pdo->prepare(
-            'SELECT 1 FROM usuario_sistema WHERE lower(email) = lower(:email) AND id IS DISTINCT FROM CAST(:id AS uuid)'
-        );
+        $consulta = $this->pdo->prepare('SELECT cg_email_em_uso(:email, CAST(:id AS uuid))');
         $consulta->execute(['email' => $email, 'id' => $excetoId]);
 
-        return $consulta->fetchColumn() !== false;
+        return (bool) $consulta->fetchColumn();
     }
 
     public function contarAdministradoresAtivos(?string $excetoId = null): int
@@ -78,12 +95,14 @@ final class UsuarioRepositorio
         $consulta = $this->pdo->prepare(<<<'SQL'
             SELECT count(*) FROM usuario_papel p JOIN usuario_sistema u ON u.id = p.usuario_id
              WHERE p.papel = 'administrador' AND u.ativo AND u.id IS DISTINCT FROM CAST(:id AS uuid)
+               AND u.organizacao_id = cg_org_atual()
             SQL);
         $consulta->execute(['id' => $excetoId]);
 
         return (int) $consulta->fetchColumn();
     }
 
+    /** O usuário pertence à organização do contexto atual (DEFAULT cg_org_atual()). */
     public function inserir(string $nome, string $email, string $senhaHash, bool $deveTrocarSenha): string
     {
         $consulta = $this->pdo->prepare(<<<'SQL'

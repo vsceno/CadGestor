@@ -67,6 +67,16 @@ final class Aplicacao
 
         try {
             return $this->roteador->despachar($requisicao);
+        } catch (ErroValidacao $erro) {
+            // "Registro não encontrado" vindo de um serviço (ex.: UUID inexistente
+            // ou de outra organização, que o RLS esconde) é 404, não erro interno.
+            if (array_keys($erro->erros) !== ['id']) {
+                return $this->tratadorErros->tratar($erro, $api);
+            }
+
+            return $api
+                ? Resposta::json(['erro' => 'nao_encontrado', 'mensagem' => 'Registro não encontrado.'], 404)
+                : Resposta::html(Visao::renderizar('erros/404', ['titulo' => 'Página não encontrada']), 404);
         } catch (Throwable $erro) {
             return $this->tratadorErros->tratar($erro, $api);
         }

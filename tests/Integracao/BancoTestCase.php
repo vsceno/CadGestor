@@ -20,6 +20,11 @@ use Throwable;
  * (DB_TESTE_BANCO, definido no phpunit.xml), aplica todas as migrações e os
  * seeds. Cada teste roda dentro de uma transação desfeita no tearDown, então
  * um teste nunca enxerga dados de outro.
+ *
+ * Multi-tenant: é criada uma "Organização de teste" e cada teste começa com o
+ * contexto do banco nela, então os INSERTs dos testes caem nessa organização
+ * (DEFAULT cg_org_atual()). A conexão de teste é do papel dono, que não passa
+ * pelo RLS; o isolamento em si é testado com a conexão da aplicação.
  */
 abstract class BancoTestCase extends TestCase
 {
@@ -27,6 +32,7 @@ abstract class BancoTestCase extends TestCase
     private static ?PDO $pdoOwner = null;
     private static ?string $falhaPreparacao = null;
     private static bool $preparado = false;
+    private static string $organizacaoTeste = '';
 
     protected PDO $pdo;
 
@@ -40,6 +46,7 @@ abstract class BancoTestCase extends TestCase
 
         $this->pdo = self::$pdoOwner;
         $this->pdo->beginTransaction();
+        self::usarOrganizacao($this->pdo, self::$organizacaoTeste);
     }
 
     protected function tearDown(): void
@@ -62,6 +69,32 @@ abstract class BancoTestCase extends TestCase
             $ambiente->texto('DB_SENHA', ''),
             $ambiente->texto('DB_SCHEMA'),
         ))->pdo();
+    }
+
+    protected static function organizacaoTeste(): string
+    {
+        return self::$organizacaoTeste;
+    }
+
+    /** Contexto de organização até o fim da transação atual (null = sem organização). */
+    protected static function usarOrganizacao(PDO $pdo, ?string $organizacaoId, bool $plataforma = false): void
+    {
+        $pdo->prepare(<<<'SQL'
+            SELECT set_config('app.organizacao_id', :o, true), set_config('app.plataforma', :p, true)
+            SQL)->execute(['o' => $organizacaoId ?? '', 'p' => $plataforma ? 'on' : 'off']);
+    }
+
+    /** Organização nova, já com perfis padrão e termo modelo. */
+    protected function criarOrganizacao(string $nome): string
+    {
+        $id = $this->inserir('INSERT INTO organizacao (nome) VALUES (:n) RETURNING id', ['n' => $nome]);
+
+        // Uma sessão de organização só provisiona a si mesma.
+        self::usarOrganizacao($this->pdo, $id);
+        $this->pdo->prepare('SELECT cg_provisionar_organizacao(:id)')->execute(['id' => $id]);
+        self::usarOrganizacao($this->pdo, self::$organizacaoTeste);
+
+        return $id;
     }
 
     protected static function raiz(): string
@@ -219,6 +252,10 @@ abstract class BancoTestCase extends TestCase
 
             (new Migrador($pdo, self::raiz() . '/database/migracoes'))->migrar();
             (new ExecutorSeeds($pdo, self::raiz() . '/database/seeds'))->executar();
+
+            $organizacao = $pdo->query("INSERT INTO organizacao (nome) VALUES ('Organização de teste') RETURNING id");
+            self::$organizacaoTeste = (string) $organizacao->fetchColumn();
+            $pdo->prepare('SELECT cg_provisionar_organizacao(:id)')->execute(['id' => self::$organizacaoTeste]);
 
             self::$ambiente = $ambiente;
             self::$pdoOwner = $pdo;

@@ -27,13 +27,31 @@ final class PapeisESenhaTest extends TestCase
         self::assertTrue($this->usuario(Papel::Consulta)->temPapel(Papel::CadastroEmpresa, Papel::Consulta));
     }
 
-    public function testAdministradorTemTodosOsPapeis(): void
+    public function testAdministradorTemTodosOsPapeisDaOrganizacao(): void
     {
         $admin = $this->usuario(Papel::Administrador);
 
-        foreach (Papel::cases() as $papel) {
+        foreach (Papel::daOrganizacao() as $papel) {
             self::assertTrue($admin->temPapel($papel));
         }
+    }
+
+    public function testAdministradorDeOrganizacaoNaoEhDaPlataforma(): void
+    {
+        self::assertFalse($this->usuario(Papel::Administrador)->temPapel(Papel::Plataforma));
+        self::assertNotContains(Papel::Plataforma, Papel::daOrganizacao());
+    }
+
+    public function testModosDoUsuarioDaPlataforma(): void
+    {
+        $foraDeOrganizacao = new UsuarioAutenticado('id', 'Ana', 'a@exemplo.com', [Papel::Plataforma], false, null, null, true);
+        $emSuporte = new UsuarioAutenticado('id', 'Ana', 'a@exemplo.com', [Papel::Administrador], false, 'org', 'X', true);
+
+        self::assertTrue($foraDeOrganizacao->emModoPlataforma());
+        self::assertFalse($foraDeOrganizacao->temPapel(Papel::Administrador));
+        self::assertTrue($emSuporte->emModoSuporte());
+        self::assertFalse($emSuporte->temPapel(Papel::Plataforma));
+        self::assertFalse($this->usuario(Papel::Administrador)->emModoSuporte());
     }
 
     #[DataProvider('senhas')]

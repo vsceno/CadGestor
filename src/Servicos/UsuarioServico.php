@@ -59,7 +59,7 @@ final class UsuarioServico
         bool $ativo,
         string $editorId,
     ): void {
-        $atual = $this->usuarios->buscarPorId($id) ?? throw ErroValidacao::campo('id', 'Usuário não encontrado.');
+        $atual = $this->usuarioDaOrganizacao($id);
         [$nome, $email, $listaPapeis] = $this->validar($nome, $email, $papeis, $id);
 
         $continuaAdmin = $ativo && in_array(Papel::Administrador, $listaPapeis, true);
@@ -95,10 +95,7 @@ final class UsuarioServico
     /** @return string nova senha provisória */
     public function redefinirSenha(string $id): string
     {
-        if ($this->usuarios->buscarPorId($id) === null) {
-            throw ErroValidacao::campo('id', 'Usuário não encontrado.');
-        }
-
+        $this->usuarioDaOrganizacao($id);
         $senha = $this->hashSenha->gerarSenhaAleatoria();
         $this->usuarios->definirSenha($id, $this->hashSenha->gerar($senha), true);
         $this->auditoria->registrar('senha_alterada', 'usuario_sistema', $id, null, ['provisoria' => true]);
@@ -137,6 +134,23 @@ final class UsuarioServico
     }
 
     /**
+     * Usuário editável pela tela de usuários: da organização do contexto. A
+     * conta de um usuário da plataforma (em modo suporte) não aparece aqui.
+     *
+     * @return array<string, mixed>
+     */
+    private function usuarioDaOrganizacao(string $id): array
+    {
+        $usuario = $this->usuarios->buscarPorId($id);
+
+        if ($usuario === null || $usuario['organizacao_id'] === null) {
+            throw ErroValidacao::campo('id', 'Usuário não encontrado.');
+        }
+
+        return $usuario;
+    }
+
+    /**
      * @param list<string> $papeis
      * @return array{0: string, 1: string, 2: list<Papel>}
      */
@@ -156,8 +170,10 @@ final class UsuarioServico
             $erros['email'] = 'Já existe um usuário com este e-mail.';
         }
 
+        // Só papéis de organização: o papel da plataforma nunca vem da tela de usuários.
         $listaPapeis = array_values(array_unique(array_filter(
             array_map(static fn (string $p): ?Papel => Papel::tryFrom($p), $papeis),
+            static fn (?Papel $p): bool => $p !== null && $p !== Papel::Plataforma,
         ), SORT_REGULAR));
 
         if ($listaPapeis === []) {

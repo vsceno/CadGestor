@@ -47,7 +47,9 @@ final class EventoRepositorio
         $total->execute($params);
 
         $consulta = $this->pdo->prepare(<<<SQL
-            SELECT a.*, c.nome AS catraca_nome, p.nome AS pessoa_nome, u.nome AS tratado_por_nome
+            SELECT a.*, c.nome AS catraca_nome, p.nome AS pessoa_nome,
+                   COALESCE(u.nome, CASE WHEN a.tratado_por IS NOT NULL THEN 'Suporte da plataforma' END)
+                       AS tratado_por_nome
               FROM alerta a
               LEFT JOIN catraca c ON c.id = a.catraca_id
               LEFT JOIN pessoa p ON p.id = a.pessoa_id

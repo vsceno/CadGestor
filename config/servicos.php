@@ -14,6 +14,7 @@ use CadGestor\Http\Controllers\CatracaController;
 use CadGestor\Http\Controllers\EmpresaController;
 use CadGestor\Http\Controllers\InicioController;
 use CadGestor\Http\Controllers\LgpdController;
+use CadGestor\Http\Controllers\OrganizacaoController;
 use CadGestor\Http\Controllers\PainelController;
 use CadGestor\Http\Controllers\PerfilController;
 use CadGestor\Http\Controllers\PessoaController;
@@ -23,12 +24,14 @@ use CadGestor\Http\Controllers\SaudeController;
 use CadGestor\Http\Controllers\SimuladorController;
 use CadGestor\Http\Controllers\UsuarioController;
 use CadGestor\Http\Controllers\VinculoController;
+use CadGestor\Banco\ContextoBanco;
 use CadGestor\Nucleo\Aplicacao;
 use CadGestor\Nucleo\Container;
 use CadGestor\Repositorios\CatracaRepositorio;
 use CadGestor\Repositorios\EmpresaRepositorio;
 use CadGestor\Repositorios\EventoRepositorio;
 use CadGestor\Repositorios\LgpdRepositorio;
+use CadGestor\Repositorios\OrganizacaoRepositorio;
 use CadGestor\Repositorios\PerfilRepositorio;
 use CadGestor\Repositorios\PessoaRepositorio;
 use CadGestor\Repositorios\RegraAcessoRepositorio;
@@ -52,6 +55,7 @@ use CadGestor\Servicos\BiometriaServico;
 use CadGestor\Servicos\CatracaServico;
 use CadGestor\Servicos\ConsentimentoServico;
 use CadGestor\Servicos\EmpresaServico;
+use CadGestor\Servicos\OrganizacaoServico;
 use CadGestor\Servicos\PerfilServico;
 use CadGestor\Servicos\PessoaServico;
 use CadGestor\Servicos\RegraAcessoServico;
@@ -62,6 +66,9 @@ use CadGestor\Servicos\VinculoServico;
 return static function (Container $c, Aplicacao $app): void {
     $pdo = static fn (): PDO => $app->banco->pdo();
     $ambiente = $app->ambiente;
+
+    // --- Contexto da organização no banco (RLS) ------------------------------
+    $c->registrar(ContextoBanco::class, static fn (): ContextoBanco => new ContextoBanco($pdo()));
 
     // --- Segurança ---------------------------------------------------------
     $c->registrar(Sessao::class, static fn (): Sessao => new Sessao(
@@ -77,6 +84,8 @@ return static function (Container $c, Aplicacao $app): void {
     $c->registrar(Auditoria::class, static fn (): Auditoria => new Auditoria($pdo(), $app->contexto));
     $c->registrar(Autenticacao::class, static fn (Container $c): Autenticacao => new Autenticacao(
         $c->obter(UsuarioRepositorio::class),
+        $c->obter(OrganizacaoRepositorio::class),
+        $c->obter(ContextoBanco::class),
         $c->obter(Sessao::class),
         $c->obter(Csrf::class),
         $c->obter(HashSenha::class),
@@ -90,7 +99,7 @@ return static function (Container $c, Aplicacao $app): void {
         [
             UsuarioRepositorio::class, EmpresaRepositorio::class, PerfilRepositorio::class,
             CatracaRepositorio::class, RegraAcessoRepositorio::class, PessoaRepositorio::class,
-            VinculoRepositorio::class, LgpdRepositorio::class, EventoRepositorio::class,
+            VinculoRepositorio::class, LgpdRepositorio::class, EventoRepositorio::class, OrganizacaoRepositorio::class,
         ] as $repositorio
     ) {
         $c->registrar($repositorio, static fn (): object => new $repositorio($pdo()));
@@ -125,6 +134,14 @@ return static function (Container $c, Aplicacao $app): void {
         $pdo(),
         $c->obter(UsuarioRepositorio::class),
         $c->obter(HashSenha::class),
+        $c->obter(Auditoria::class),
+    ));
+
+    $c->registrar(OrganizacaoServico::class, static fn (Container $c): OrganizacaoServico => new OrganizacaoServico(
+        $pdo(),
+        $c->obter(OrganizacaoRepositorio::class),
+        $c->obter(UsuarioServico::class),
+        $c->obter(ContextoBanco::class),
         $c->obter(Auditoria::class),
     ));
 
@@ -222,6 +239,14 @@ return static function (Container $c, Aplicacao $app): void {
         $c->obter(RegraAcessoRepositorio::class),
         $c->obter(EmpresaServico::class),
     ));
+    $c->registrar(OrganizacaoController::class, static fn (Container $c): OrganizacaoController =>
+        new OrganizacaoController(
+            $c->obter(Sessao::class),
+            $c->obter(OrganizacaoRepositorio::class),
+            $c->obter(UsuarioRepositorio::class),
+            $c->obter(OrganizacaoServico::class),
+            $c->obter(Autenticacao::class),
+        ));
     $c->registrar(PerfilController::class, static fn (Container $c): PerfilController => new PerfilController(
         $c->obter(Sessao::class),
         $c->obter(PerfilRepositorio::class),
@@ -266,6 +291,7 @@ return static function (Container $c, Aplicacao $app): void {
     $c->registrar(ApiCatracaController::class, static fn (Container $c): ApiCatracaController =>
         new ApiCatracaController(
             $c->obter(CatracaRepositorio::class),
+            $c->obter(ContextoBanco::class),
             $c->obter(AcessoServico::class),
             $c->obter(SincronizacaoDispositivo::class),
             (float) $ambiente->texto('LIMIAR_CONFIANCA', '0.80'),

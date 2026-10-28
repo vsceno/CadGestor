@@ -6,6 +6,7 @@ namespace CadGestor\Http\Controllers;
 
 use CadGestor\Acesso\AcessoServico;
 use CadGestor\Acesso\SincronizacaoDispositivo;
+use CadGestor\Banco\ContextoBanco;
 use CadGestor\Biometria\TipoBiometria;
 use CadGestor\Nucleo\Requisicao;
 use CadGestor\Nucleo\Resposta;
@@ -23,6 +24,7 @@ final class ApiCatracaController
 
     public function __construct(
         private readonly CatracaRepositorio $catracas,
+        private readonly ContextoBanco $contextoBanco,
         private readonly AcessoServico $acesso,
         private readonly SincronizacaoDispositivo $sincronizacao,
         private readonly float $limiarConfianca,
@@ -168,10 +170,17 @@ final class ApiCatracaController
         $padrao = '/^Bearer\s+(' . preg_quote(CatracaServico::PREFIXO_TOKEN, '/') . '[0-9a-f]{64})$/';
 
         if (preg_match($padrao, $cabecalho, $m) === 1) {
-            $catraca = $this->catracas->buscarPorTokenHash(CatracaServico::hashToken($m[1]));
+            // O token identifica a catraca e, com ela, a organização: daqui em
+            // diante a requisição só enxerga os dados dessa organização.
+            $conta = $this->catracas->localizarPorToken(CatracaServico::hashToken($m[1]));
 
-            if ($catraca !== null) {
-                return $catraca;
+            if ($conta !== null) {
+                $this->contextoBanco->definir($conta['organizacao_id']);
+                $catraca = $this->catracas->buscar($conta['catraca_id']);
+
+                if ($catraca !== null) {
+                    return $catraca;
+                }
             }
         }
 

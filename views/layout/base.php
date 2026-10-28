@@ -33,6 +33,11 @@ if (\CadGestor\Nucleo\Visao::compartilhado('simulador_disponivel', false)) {
     $menu[] = ['Simulador', '/simulador', [Papel::Administrador]];
 }
 
+// Modo plataforma: fora de qualquer organização, só a gestão de organizações.
+if ($usuario?->emModoPlataforma()) {
+    $menu = [['Organizações', '/organizacoes', [Papel::Plataforma]]];
+}
+
 $itensVisiveis = $usuario === null || $usuario->deveTrocarSenha ? [] : array_filter(
     $menu,
     static fn (array $item): bool => $item[2] === [] || $usuario->temPapel(...$item[2]),
@@ -60,6 +65,11 @@ $itensVisiveis = $usuario === null || $usuario->deveTrocarSenha ? [] : array_fil
         <?php endif; ?>
         <?php if ($usuario !== null) : ?>
             <div class="conta">
+                <?php if ($usuario->organizacaoNome !== null) : ?>
+                    <span class="conta-organizacao"><?= e($usuario->organizacaoNome) ?></span>
+                <?php elseif ($usuario->emModoPlataforma()) : ?>
+                    <span class="conta-organizacao">Plataforma</span>
+                <?php endif; ?>
                 <span class="conta-nome"><?= e($usuario->primeiroNome()) ?></span>
                 <a href="/senha">Trocar senha</a>
                 <form method="post" action="/sair" class="form-inline">
@@ -69,6 +79,16 @@ $itensVisiveis = $usuario === null || $usuario->deveTrocarSenha ? [] : array_fil
             </div>
         <?php endif; ?>
     </header>
+    <?php if ($usuario?->emModoSuporte()) : ?>
+        <div class="faixa-suporte" role="status">
+            <span>Modo suporte em <strong><?= e($usuario->organizacaoNome) ?></strong>: suas ações ficam
+                registradas na auditoria desta organização.</span>
+            <form method="post" action="/suporte/sair" class="form-inline">
+                <?= csrf_campo() ?>
+                <button type="submit" class="botao">Sair da organização</button>
+            </form>
+        </div>
+    <?php endif; ?>
     <main class="conteudo">
         <?php foreach ($mensagens as $mensagem) : ?>
             <div class="alerta alerta-<?= e($mensagem['tipo']) ?>" role="status"><?= e($mensagem['mensagem']) ?></div>

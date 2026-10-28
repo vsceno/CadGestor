@@ -4,7 +4,8 @@
  * Tabela de rotas da aplicação.
  *
  * Toda rota web passa por: sessão -> CSRF (em POST) -> login -> papel.
- * Parâmetros {id} aceitam apenas UUID.
+ * Parâmetros {id} aceitam apenas UUID. O isolamento entre organizações não
+ * depende das rotas: o banco (RLS) só mostra linhas da organização da sessão.
  */
 
 declare(strict_types=1);
@@ -17,6 +18,7 @@ use CadGestor\Http\Controllers\CatracaController;
 use CadGestor\Http\Controllers\EmpresaController;
 use CadGestor\Http\Controllers\InicioController;
 use CadGestor\Http\Controllers\LgpdController;
+use CadGestor\Http\Controllers\OrganizacaoController;
 use CadGestor\Http\Controllers\PainelController;
 use CadGestor\Http\Controllers\PerfilController;
 use CadGestor\Http\Controllers\PessoaController;
@@ -78,6 +80,23 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
             $rotas->get('/senha', $acao(AutenticacaoController::class, 'formularioSenha'));
             $rotas->post('/senha', $acao(AutenticacaoController::class, 'trocarSenha'));
             $rotas->get('/painel', $acao(PainelController::class, 'index'));
+            $rotas->post('/suporte/sair', $acao(OrganizacaoController::class, 'sairDoSuporte'));
+
+            // --- Plataforma: organizações (clientes) e modo suporte --------
+            $rotas->grupo([$papel(Papel::Plataforma)], static function (Roteador $rotas) use ($acao): void {
+                $rotas->get('/organizacoes', $acao(OrganizacaoController::class, 'index'));
+                $rotas->get('/organizacoes/nova', $acao(OrganizacaoController::class, 'novo'));
+                $rotas->post('/organizacoes', $acao(OrganizacaoController::class, 'criar'));
+                $rotas->get('/organizacoes/{id}', $acao(OrganizacaoController::class, 'ver'));
+                $rotas->get('/organizacoes/{id}/editar', $acao(OrganizacaoController::class, 'editar'));
+                $rotas->post('/organizacoes/{id}', $acao(OrganizacaoController::class, 'atualizar'));
+                $rotas->post('/organizacoes/{id}/situacao', $acao(OrganizacaoController::class, 'alterarSituacao'));
+                $rotas->post(
+                    '/organizacoes/{id}/administradores',
+                    $acao(OrganizacaoController::class, 'criarAdministrador'),
+                );
+                $rotas->post('/organizacoes/{id}/entrar', $acao(OrganizacaoController::class, 'entrar'));
+            });
 
             // --- Alertas: consulta vê, administrador trata ------------------
             $rotas->get('/alertas', $acao(AlertaController::class, 'index'), [$papel(Papel::Consulta)]);

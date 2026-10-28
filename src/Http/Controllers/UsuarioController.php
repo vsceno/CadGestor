@@ -58,7 +58,7 @@ final class UsuarioController extends Controlador
     /** @param array<string, string> $parametros */
     public function editar(Requisicao $requisicao, array $parametros): Resposta
     {
-        $usuario = $this->repositorio->buscarPorId($parametros['id']);
+        $usuario = $this->usuarioDaOrganizacao($parametros['id']);
 
         if ($usuario === null) {
             return $this->naoEncontrado();
@@ -91,7 +91,7 @@ final class UsuarioController extends Controlador
     /** @param array<string, string> $parametros */
     public function redefinirSenha(Requisicao $requisicao, array $parametros): Resposta
     {
-        $usuario = $this->repositorio->buscarPorId($parametros['id']);
+        $usuario = $this->usuarioDaOrganizacao($parametros['id']);
 
         if ($usuario === null) {
             return $this->naoEncontrado();
@@ -100,6 +100,19 @@ final class UsuarioController extends Controlador
         $senha = $this->servico->redefinirSenha($parametros['id']);
 
         return $this->senhaGerada($senha, (string) $usuario['email'], 'Senha redefinida');
+    }
+
+    /**
+     * Só usuários da organização do contexto (a conta da plataforma, em modo
+     * suporte, não é editável por aqui).
+     *
+     * @return array<string, mixed>|null
+     */
+    private function usuarioDaOrganizacao(string $id): ?array
+    {
+        $usuario = $this->repositorio->buscarPorId($id);
+
+        return $usuario === null || $usuario['organizacao_id'] === null ? null : $usuario;
     }
 
     /**

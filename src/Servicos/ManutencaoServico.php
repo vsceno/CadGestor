@@ -20,6 +20,10 @@ use PDO;
  *  4. limpeza   - remove dados técnicos antigos (tentativas de login e fila concluída).
  *
  * Com $simular = true nada é alterado: só conta o que seria feito.
+ *
+ * O job roda com o papel dono, que não passa pelo RLS e enxerga todas as
+ * organizações. Por isso cada alteração é feita dentro da organização do
+ * registro (usarOrganizacao), e a auditoria vai para a trilha do cliente certo.
  */
 final class ManutencaoServico
 {
@@ -54,6 +58,8 @@ final class ManutencaoServico
         }
 
         if (!$simular) {
+            // O resumo do job é da plataforma, não de uma organização.
+            $this->usarOrganizacao(null);
             $this->auditoria->registrar('job_manutencao', null, null, null, $resultado + [
                 'retencao_dias' => $this->retencao->dias(),
             ]);
@@ -65,7 +71,7 @@ final class ManutencaoServico
     public function encerrarVinculosVencidos(DateTimeImmutable $hoje, bool $simular): int
     {
         $consulta = $this->pdo->prepare(<<<'SQL'
-            SELECT id, pessoa_id, status FROM vinculo
+            SELECT id, pessoa_id, status, organizacao_id FROM vinculo
              WHERE status <> 'encerrado' AND data_fim IS NOT NULL AND data_fim < :hoje
             SQL);
         $consulta->execute(['hoje' => $hoje->format('Y-m-d')]);
@@ -77,6 +83,7 @@ final class ManutencaoServico
 
         foreach ($vencidos as $vinculo) {
             Transacao::executar($this->pdo, function () use ($vinculo): void {
+                $this->usarOrganizacao((string) $vinculo['organizacao_id']);
                 $this->pdo->prepare(<<<'SQL'
                     UPDATE vinculo
                        SET status = 'encerrado', encerrado_em = now(),
@@ -113,7 +120,11 @@ final class ManutencaoServico
                 continue;
             }
 
-            $biometrias += Transacao::executar($this->pdo, fn (): int => $this->anonimizar((string) $pessoa['id']));
+            $biometrias += Transacao::executar($this->pdo, function () use ($pessoa): int {
+                $this->usarOrganizacao((string) $pessoa['organizacao_id']);
+
+                return $this->anonimizar((string) $pessoa['id']);
+            });
         }
 
         return ['titulares_anonimizados' => $anonimizados, 'biometrias_excluidas' => $biometrias];
@@ -122,7 +133,7 @@ final class ManutencaoServico
     public function alertarCatracasSemContato(bool $simular): int
     {
         $consulta = $this->pdo->prepare(<<<'SQL'
-            SELECT c.id, c.nome FROM catraca c
+            SELECT c.id, c.organizacao_id FROM catraca c
              WHERE c.ativo
                AND COALESCE(c.ultimo_contato_em, c.created_at) < now() - make_interval(mins => :minutos)
                AND NOT EXISTS (
@@ -135,12 +146,13 @@ final class ManutencaoServico
 
         if (!$simular) {
             $insercao = $this->pdo->prepare(<<<'SQL'
-                INSERT INTO alerta (tipo, descricao, catraca_id)
-                VALUES ('dispositivo_offline', :d, :c)
+                INSERT INTO alerta (organizacao_id, tipo, descricao, catraca_id)
+                VALUES (:o, 'dispositivo_offline', :d, :c)
                 SQL);
 
             foreach ($catracas as $catraca) {
                 $insercao->execute([
+                    'o' => $catraca['organizacao_id'],
                     'c' => $catraca['id'],
                     'd' => sprintf(
                         'Catraca sem contato com o servidor há mais de %d minutos.',
@@ -212,13 +224,23 @@ final class ManutencaoServico
     private function candidatosRetencao(): array
     {
         return $this->pdo->query(<<<'SQL'
-            SELECT p.id, p.created_at::date::text AS created_at
+            SELECT p.id, p.organizacao_id, p.created_at::date::text AS created_at
               FROM pessoa p
              WHERE p.anonimizada_em IS NULL
                AND NOT EXISTS (
                    SELECT 1 FROM vinculo v WHERE v.pessoa_id = p.id AND v.status <> 'encerrado' AND v.data_fim IS NULL
                )
             SQL)->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * Faz a transação atual operar na organização informada (vale até o fim
+     * da transação): INSERTs sem organização explícita e a auditoria usam ela.
+     */
+    private function usarOrganizacao(?string $organizacaoId): void
+    {
+        $this->pdo->prepare("SELECT set_config('app.organizacao_id', :o, true)")
+            ->execute(['o' => $organizacaoId ?? '']);
     }
 
     /** @return list<array{status: string, data_inicio: string, data_fim: ?string}> */

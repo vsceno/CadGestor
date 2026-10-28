@@ -21,6 +21,7 @@ final class PermissoesAppTest extends BancoTestCase
         parent::setUp();
         $this->app = self::conexaoApp();
         $this->app->beginTransaction();
+        self::usarOrganizacao($this->app, self::organizacaoTeste());
     }
 
     protected function tearDown(): void
@@ -58,6 +59,7 @@ final class PermissoesAppTest extends BancoTestCase
         yield 'apagar consentimento' => ['DELETE FROM consentimento'];
         yield 'apagar biometria' => ['DELETE FROM biometria'];
         yield 'alterar controle de migração' => ["UPDATE migracao SET checksum = 'x'"];
+        yield 'apagar organização' => ['DELETE FROM organizacao'];
         yield 'criar tabela' => ['CREATE TABLE invasao (id int)'];
         yield 'apagar tabela' => ['DROP TABLE empresa'];
     }

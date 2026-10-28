@@ -70,7 +70,9 @@ final class LgpdRepositorio
     public function consentimentoAtivo(string $pessoaId): ?array
     {
         $consulta = $this->pdo->prepare(<<<'SQL'
-            SELECT c.*, u.nome AS registrado_por_nome
+            SELECT c.*,
+                   COALESCE(u.nome, CASE WHEN c.registrado_por IS NOT NULL THEN 'Suporte da plataforma' END)
+                       AS registrado_por_nome
               FROM consentimento c LEFT JOIN usuario_sistema u ON u.id = c.registrado_por
              WHERE c.pessoa_id = :p AND c.finalidade = :f AND c.revogado_em IS NULL
             SQL);

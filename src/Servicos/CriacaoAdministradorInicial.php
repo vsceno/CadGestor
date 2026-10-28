@@ -10,7 +10,8 @@ use PDO;
 use Throwable;
 
 /**
- * Cria o primeiro administrador do sistema.
+ * Cria o primeiro administrador da PLATAFORMA (quem cadastra as organizações
+ * e os administradores de cada uma).
  *
  * A senha não é escolhida nem fica em arquivo: é gerada aleatoriamente,
  * exibida uma única vez no terminal e o usuário é obrigado a trocá-la no
@@ -26,7 +27,7 @@ final class CriacaoAdministradorInicial
 
     /**
      * @return array{id: string, senha: string}
-     * @throws DomainException quando os dados são inválidos ou já existe administrador ativo
+     * @throws DomainException quando os dados são inválidos ou já existe administrador da plataforma ativo
      */
     public function criar(string $nome, string $email): array
     {
@@ -46,13 +47,14 @@ final class CriacaoAdministradorInicial
         $this->pdo->beginTransaction();
 
         try {
+            // Sem organização (organizacao_id NULL): é um usuário da plataforma.
             // Trava a tabela de papéis para que duas execuções simultâneas
             // não criem dois "primeiros" administradores.
             $this->pdo->exec('LOCK TABLE usuario_papel IN SHARE ROW EXCLUSIVE MODE');
 
             if ($this->existeAdministradorAtivo()) {
                 throw new DomainException(
-                    'Já existe um administrador ativo. Use a tela de usuários para criar outros.'
+                    'Já existe um administrador da plataforma ativo.'
                 );
             }
 
@@ -64,8 +66,8 @@ final class CriacaoAdministradorInicial
             }
 
             $insercao = $this->pdo->prepare(<<<'SQL'
-                INSERT INTO usuario_sistema (nome, email, senha_hash, deve_trocar_senha)
-                VALUES (:nome, :email, :senha_hash, true)
+                INSERT INTO usuario_sistema (organizacao_id, nome, email, senha_hash, deve_trocar_senha)
+                VALUES (NULL, :nome, :email, :senha_hash, true)
                 RETURNING id
                 SQL);
             $insercao->execute([
@@ -76,7 +78,7 @@ final class CriacaoAdministradorInicial
             $id = (string) $insercao->fetchColumn();
 
             $this->pdo
-                ->prepare("INSERT INTO usuario_papel (usuario_id, papel) VALUES (:id, 'administrador')")
+                ->prepare("INSERT INTO usuario_papel (usuario_id, papel) VALUES (:id, 'plataforma')")
                 ->execute(['id' => $id]);
 
             // A trilha registra o fato, sem repetir nome/e-mail (minimização).
@@ -85,7 +87,7 @@ final class CriacaoAdministradorInicial
                 VALUES ('seed', 'usuario_sistema', :id, :dados)
                 SQL)->execute([
                 'id' => $id,
-                'dados' => json_encode(['papel' => 'administrador', 'deve_trocar_senha' => true]),
+                'dados' => json_encode(['papel' => 'plataforma', 'deve_trocar_senha' => true]),
             ]);
 
             $this->pdo->commit();
@@ -104,7 +106,7 @@ final class CriacaoAdministradorInicial
                 SELECT 1
                   FROM usuario_papel p
                   JOIN usuario_sistema u ON u.id = p.usuario_id
-                 WHERE p.papel = 'administrador' AND u.ativo
+                 WHERE p.papel = 'plataforma' AND u.ativo
             )
             SQL)->fetchColumn();
     }

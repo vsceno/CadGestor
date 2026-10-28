@@ -28,14 +28,14 @@ $papeisMarcados = is_array($dados['papeis'] ?? null) ? $dados['papeis'] : [];
 
         <fieldset>
             <legend>Papéis</legend>
-            <?php foreach (Papel::cases() as $papel) : ?>
+            <?php foreach (Papel::daOrganizacao() as $papel) : ?>
                 <label class="opcao">
                     <input type="checkbox" name="papeis[]" value="<?= e($papel->value) ?>"
                         <?= marcado(in_array($papel->value, $papeisMarcados, true)) ?>>
                     <?= e($papel->rotulo()) ?>
                 </label>
             <?php endforeach; ?>
-            <p class="dica">O administrador tem acesso a todos os módulos.</p>
+            <p class="dica">O administrador tem acesso a todos os módulos desta organização.</p>
             <?= erro_campo($erros, 'papeis') ?>
         </fieldset>
 

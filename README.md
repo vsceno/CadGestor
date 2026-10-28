@@ -153,8 +153,8 @@ inacessíveis.
 ```powershell
 php bin/migrar.php --status   # lista migrações aplicadas e pendentes
 php bin/migrar.php            # aplica as pendentes (usa o papel cadgestor_owner)
-php bin/seed.php              # perfis padrão (pode rodar várias vezes)
-php bin/criar-admin.php --nome="Nome Completo" --email=admin@empresa.com.br
+php bin/seed.php              # perfis padrão e termo modelo de cada organização (pode rodar várias vezes)
+php bin/criar-admin.php --nome="Nome Completo" --email=admin@empresa.com.br   # administrador da PLATAFORMA
 ```
 
 - **Migrações só andam para frente.** Cada arquivo aplicado fica registrado com
@@ -164,6 +164,9 @@ php bin/criar-admin.php --nome="Nome Completo" --email=admin@empresa.com.br
 - **A senha do administrador** é gerada aleatoriamente e exibida **uma única vez**.
   Ela não fica gravada em nenhum arquivo, e a troca é obrigatória no primeiro login
   (Fase 2). O script recusa criar um segundo administrador por esse caminho.
+- **Depois do primeiro login**, o administrador da plataforma cadastra as
+  organizações (clientes) em `/organizacoes` e o administrador de cada uma (ver
+  "Multi-tenant" abaixo).
 
 ### 7. Verificação
 
@@ -226,7 +229,8 @@ ele for igual ao `DB_BANCO` do `.env`. Sem o banco de teste, esses testes são p
 
 | Papel | Acesso |
 |---|---|
-| `administrador` | Tudo, incluindo usuários, perfis, termos LGPD, auditoria e diagnóstico |
+| `plataforma` | Só no modo plataforma: organizações (clientes), seus administradores e o modo suporte |
+| `administrador` | Tudo **na própria organização**, incluindo usuários, perfis, termos LGPD, auditoria e diagnóstico |
 | `cadastro_empresa` | Empresas, horários, catracas e regras de acesso por perfil |
 | `cadastro_pessoa` | Pessoas, vínculos, consentimento e biometria |
 | `consulta` | Relatórios, exportação CSV e alertas (somente leitura) |
@@ -437,6 +441,64 @@ schtasks /Create /TN "CadGestor - manutencao" /SC DAILY /ST 02:00 /RU SYSTEM `
 checklist do escopo, as verificações feitas, as correções, o que configurar em
 produção e os riscos residuais.
 
+### Multi-tenant: organizações isoladas (migração 0010)
+
+O CadGestor atende **vários clientes** numa mesma instalação. Cada cliente é uma
+**organização**, com suas próprias empresas, perfis, catracas, pessoas, vínculos,
+consentimentos, biometrias, eventos, alertas, usuários e auditoria. Uma organização
+**nunca** enxerga os dados de outra.
+
+Pense num prédio comercial: cada andar é uma organização, e o crachá que a recepção
+entrega só abre as portas do andar daquela empresa. Aqui, quem confere o crachá é o
+próprio banco de dados.
+
+**Como o isolamento é garantido (camadas):**
+
+1. **Row-Level Security (RLS) no PostgreSQL.** No início de cada requisição a
+   aplicação informa a organização ao banco (`ContextoBanco`, via `set_config`). As
+   políticas só mostram e só aceitam linhas daquela organização, mesmo que uma
+   consulta esqueça o filtro. Sem organização definida, nada aparece.
+2. **`organizacao_id` com `DEFAULT cg_org_atual()`.** Os INSERTs pegam a organização
+   do contexto automaticamente.
+3. **Chaves estrangeiras compostas `(organizacao_id, id)`.** Mesmo sabendo o UUID de
+   uma empresa de outro cliente, não é possível criar um vínculo apontando para ela.
+4. **Trigger `impedir_troca_organizacao`.** Nenhum registro muda de organização.
+5. **Papel `plataforma` travado no banco.** Um administrador de cliente não consegue
+   se promover a administrador da plataforma.
+
+**Usuários:**
+
+| Tipo | `organizacao_id` | O que faz |
+|---|---|---|
+| Plataforma | `NULL` | Cadastra organizações e o administrador de cada uma; vê só contagens (nenhum dado pessoal) |
+| Organização | preenchido | Trabalha só dentro da própria organização, conforme os papéis |
+
+- **Modo suporte:** a plataforma pode "Entrar (suporte)" numa organização e atuar
+  como administrador dela. Uma faixa amarela avisa disso no topo da tela. A entrada
+  e a saída ficam na **auditoria da própria organização**, visível ao cliente como
+  "Suporte da plataforma".
+- **O e-mail de login é único no sistema todo.** Já CPF, CNPJ, nome de perfil,
+  identificador de catraca e versão de termo são únicos **dentro** da organização.
+  A mesma prestadora de limpeza pode atender dois clientes, como cadastros separados.
+- **Organização desativada:** os usuários dela não entram (sessões abertas caem) e
+  a API recusa as catracas dela (401).
+- **Organização nova** já nasce com os perfis padrão e o termo **modelo** 1.0
+  (`cg_provisionar_organizacao`), que deve ser revisado pelo jurídico de cada cliente.
+
+**Onde a organização ainda não é conhecida:** login (pelo e-mail) e API (pelo hash
+do token da catraca) usam funções `SECURITY DEFINER` (`cg_login_usuario`,
+`cg_catraca_por_token`), que devolvem só identificadores. Requisições com token
+inválido geram eventos e alertas **sem organização**, visíveis só no nível da
+plataforma.
+
+**Jobs de manutenção** rodam com o papel dono, que não passa pelo RLS. Por isso o
+job faz cada alteração dentro da organização do registro, e a auditoria vai para
+o cliente certo. O resumo do job fica na auditoria da plataforma.
+
+**Instalações anteriores:** a migração 0010 move os dados existentes para a
+"Organização padrão" (pode ser renomeada em `/organizacoes`). O teste
+`IsolamentoOrganizacaoTest` verifica tudo isso com a conexão real da aplicação.
+
 ### Modelo de dados (Fase 1)
 
 | Grupo | Tabelas |
@@ -490,3 +552,4 @@ produção e os riscos residuais.
 - [x] Fase 7: API da catraca e motor de decisão
 - [x] Fase 8: relatórios, CSV e auditoria
 - [x] Fase 9: jobs de manutenção, testes e revisão de segurança
+- [x] Multi-tenant: organizações isoladas por RLS, plataforma e modo suporte

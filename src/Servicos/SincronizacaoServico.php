@@ -13,6 +13,9 @@ use PDO;
  * cada catraca precisa cadastrar ou remover, e a catraca busca e confirma pela
  * API. É como uma caixa de correio por catraca: se ela estiver desligada, as
  * cartas esperam até ela voltar.
+ *
+ * A organização de cada operação vem da catraca (e não do contexto da sessão),
+ * para que o job de manutenção, que roda fora do RLS, também grave certo.
  */
 final class SincronizacaoServico
 {
@@ -24,8 +27,8 @@ final class SincronizacaoServico
     public function enviarBiometria(string $biometriaId): int
     {
         $consulta = $this->pdo->prepare(<<<'SQL'
-            INSERT INTO fila_sincronizacao (catraca_id, pessoa_id, biometria_id, operacao)
-            SELECT DISTINCT c.id, b.pessoa_id, b.id, 'cadastrar'
+            INSERT INTO fila_sincronizacao (organizacao_id, catraca_id, pessoa_id, biometria_id, operacao)
+            SELECT DISTINCT c.organizacao_id, c.id, b.pessoa_id, b.id, 'cadastrar'
               FROM biometria b
               JOIN vinculo v ON v.pessoa_id = b.pessoa_id AND v.status <> 'encerrado'
               JOIN catraca c ON c.empresa_id = v.empresa_id AND c.ativo
@@ -40,8 +43,8 @@ final class SincronizacaoServico
     public function enviarBiometriasParaEmpresa(string $pessoaId, string $empresaId): int
     {
         $consulta = $this->pdo->prepare(<<<'SQL'
-            INSERT INTO fila_sincronizacao (catraca_id, pessoa_id, biometria_id, operacao)
-            SELECT c.id, b.pessoa_id, b.id, 'cadastrar'
+            INSERT INTO fila_sincronizacao (organizacao_id, catraca_id, pessoa_id, biometria_id, operacao)
+            SELECT c.organizacao_id, c.id, b.pessoa_id, b.id, 'cadastrar'
               FROM biometria b
               JOIN catraca c ON c.empresa_id = :empresa AND c.ativo
              WHERE b.pessoa_id = :pessoa AND b.ativo
@@ -58,8 +61,8 @@ final class SincronizacaoServico
     public function removerBiometriasSemVinculo(string $pessoaId): int
     {
         $consulta = $this->pdo->prepare(<<<'SQL'
-            INSERT INTO fila_sincronizacao (catraca_id, pessoa_id, operacao)
-            SELECT DISTINCT c.id, CAST(:pessoa AS uuid), 'remover'
+            INSERT INTO fila_sincronizacao (organizacao_id, catraca_id, pessoa_id, operacao)
+            SELECT DISTINCT c.organizacao_id, c.id, CAST(:pessoa AS uuid), 'remover'
               FROM vinculo v
               JOIN catraca c ON c.empresa_id = v.empresa_id
              WHERE v.pessoa_id = :pessoa
@@ -80,8 +83,8 @@ final class SincronizacaoServico
     public function removerDeTodas(string $pessoaId): int
     {
         $consulta = $this->pdo->prepare(<<<'SQL'
-            INSERT INTO fila_sincronizacao (catraca_id, pessoa_id, operacao)
-            SELECT DISTINCT c.id, CAST(:pessoa AS uuid), 'remover'
+            INSERT INTO fila_sincronizacao (organizacao_id, catraca_id, pessoa_id, operacao)
+            SELECT DISTINCT c.organizacao_id, c.id, CAST(:pessoa AS uuid), 'remover'
               FROM vinculo v
               JOIN catraca c ON c.empresa_id = v.empresa_id
              WHERE v.pessoa_id = :pessoa

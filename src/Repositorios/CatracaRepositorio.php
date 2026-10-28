@@ -54,17 +54,23 @@ final class CatracaRepositorio
         return $consulta->fetch(PDO::FETCH_ASSOC) ?: null;
     }
 
-    /** @return array<string, mixed>|null catraca dona do token (comparação por hash) */
-    public function buscarPorTokenHash(string $tokenHash): ?array
+    /**
+     * Catraca dona do token (comparação por hash) e a organização dela. Roda
+     * antes de se conhecer a organização, por isso usa a função do banco que
+     * enxerga todas; organização desativada não é encontrada.
+     *
+     * @return array{catraca_id: string, organizacao_id: string}|null
+     */
+    public function localizarPorToken(string $tokenHash): ?array
     {
-        $consulta = $this->pdo->prepare(<<<'SQL'
-            SELECT c.*, e.ativo AS empresa_ativa
-              FROM catraca c JOIN empresa e ON e.id = c.empresa_id
-             WHERE c.token_hash = :hash
-            SQL);
+        $consulta = $this->pdo->prepare('SELECT catraca_id, organizacao_id FROM cg_catraca_por_token(:hash)');
         $consulta->execute(['hash' => $tokenHash]);
+        $linha = $consulta->fetch(PDO::FETCH_ASSOC);
 
-        return $consulta->fetch(PDO::FETCH_ASSOC) ?: null;
+        return $linha === false ? null : [
+            'catraca_id' => (string) $linha['catraca_id'],
+            'organizacao_id' => (string) $linha['organizacao_id'],
+        ];
     }
 
     public function identificadorEmUso(string $identificador, ?string $excetoId = null): bool

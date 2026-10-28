@@ -93,8 +93,8 @@ final class CadastrosEmpresaTest extends BancoTestCase
 
         self::assertStringStartsWith(CatracaServico::PREFIXO_TOKEN, $resultado['token']);
         self::assertSame(hash('sha256', $resultado['token']), $catraca['token_hash']);
-        $encontrada = $this->catracaRepo->buscarPorTokenHash(hash('sha256', $resultado['token']));
-        self::assertSame($resultado['id'], $encontrada['id']);
+        $encontrada = $this->catracaRepo->localizarPorToken(hash('sha256', $resultado['token']));
+        self::assertSame($resultado['id'], $encontrada['catraca_id']);
     }
 
     public function testRenovarTokenInvalidaOAnterior(): void
@@ -103,8 +103,8 @@ final class CadastrosEmpresaTest extends BancoTestCase
         $resultado = $this->catracas->criar($this->dadosCatraca($empresa));
         $novo = $this->catracas->renovarToken($resultado['id']);
 
-        self::assertNull($this->catracaRepo->buscarPorTokenHash(CatracaServico::hashToken($resultado['token'])));
-        self::assertNotNull($this->catracaRepo->buscarPorTokenHash(CatracaServico::hashToken($novo)));
+        self::assertNull($this->catracaRepo->localizarPorToken(CatracaServico::hashToken($resultado['token'])));
+        self::assertNotNull($this->catracaRepo->localizarPorToken(CatracaServico::hashToken($novo)));
     }
 
     public function testIdentificadorDeDispositivoUnico(): void

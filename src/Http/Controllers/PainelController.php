@@ -26,6 +26,11 @@ final class PainelController extends Controlador
     /** @param array<string, string> $parametros */
     public function index(Requisicao $requisicao, array $parametros): Resposta
     {
+        // A plataforma, fora de uma organização, não tem indicadores de cliente para ver.
+        if ($this->autenticacao->usuario()?->emModoPlataforma()) {
+            return Resposta::redirecionar('/organizacoes');
+        }
+
         $indicadores = $this->pdo->query(<<<'SQL'
             SELECT
                 (SELECT count(*) FROM empresa WHERE ativo) AS empresas,
