@@ -7,7 +7,7 @@
         ['rotulo' => 'Portaria ao vivo', 'href' => '#', 'icone' => 'portaria'],
         ['rotulo' => 'Eventos e alertas', 'href' => '#', 'icone' => 'eventos'],
         ['rotulo' => 'Empresas', 'href' => '#', 'icone' => 'empresas'],
-        ['rotulo' => 'Unidades e catracas', 'href' => '#', 'icone' => 'catraca'],
+        ['rotulo' => 'Catracas', 'href' => '#', 'icone' => 'catraca'],
         ['rotulo' => 'Regras de acesso', 'href' => '#', 'icone' => 'regras'],
         ['rotulo' => 'Relatórios', 'href' => '#', 'icone' => 'relatorios'],
         ['rotulo' => 'LGPD', 'href' => '#', 'icone' => 'lgpd'],
@@ -20,10 +20,6 @@
         ['rotulo' => 'Portaria', 'href' => '#', 'icone' => 'portaria'],
         ['rotulo' => 'Alertas', 'href' => '#', 'icone' => 'alertas'],
     ];
-    $contexto = ['rotulo' => 'Unidade', 'atual' => 'Matriz (fictícia)', 'opcoes' => [
-        ['rotulo' => 'Matriz (fictícia)', 'href' => '#', 'ativo' => true],
-        ['rotulo' => 'Filial Centro (fictícia)', 'href' => '#'],
-    ]];
     $rotuloSituacao = ['ativo' => 'Ativo', 'atencao' => 'Vence em breve', 'negado' => 'Vínculo vencido', 'inativo' => 'Inativo'];
     $cores = [
         ['bg-primaria', 'Azul', 'Ação principal'],
@@ -34,7 +30,7 @@
     ];
 @endphp
 
-<x-layouts.app titulo="Design system" :menu="$menu" :atalhos="$atalhos" :contexto="$contexto" :alertas="3"
+<x-layouts.app titulo="Design system" :menu="$menu" :atalhos="$atalhos" :alertas="3"
     :usuario="['nome' => 'Usuário de demonstração', 'papel' => 'Administrador']" buscaAcao="#">
 
     <x-slot:mensagens>
@@ -210,10 +206,10 @@
             </x-cartao>
 
             {{-- Confirmações --}}
-            <x-cartao titulo="Confirmações" descricao="Ações irreversíveis descrevem o impacto. Excluir exige digitar o nome.">
+            <x-cartao titulo="Confirmações" descricao="Ações de grande impacto descrevem o efeito. Desativar um cliente exige digitar o nome.">
                 <div class="flex flex-wrap gap-2">
-                    <x-botao variante="perigo" icone="bloquear" data-abrir-modal="modal-bloquear">Bloquear cliente</x-botao>
-                    <x-botao variante="perigo" icone="excluir" data-abrir-modal="modal-excluir">Excluir cliente</x-botao>
+                    <x-botao variante="perigo" icone="bloquear" data-abrir-modal="modal-bloquear">Bloquear acesso das pessoas</x-botao>
+                    <x-botao variante="perigo" icone="inativo" data-abrir-modal="modal-desativar">Desativar cliente</x-botao>
                 </div>
             </x-cartao>
         </div>
@@ -239,14 +235,14 @@
         </p>
     </x-cartao>
 
-    <x-modal-confirmacao id="modal-bloquear" titulo="Bloquear o cliente Construtora Exemplo?" acao="#" confirmar="Bloquear cliente">
-        <strong class="text-texto">1.284 pessoas perderão o acesso</strong> imediatamente e os usuários do cliente não conseguirão entrar.
-        Você pode desbloquear depois.
+    <x-modal-confirmacao id="modal-bloquear" titulo="Bloquear o acesso de 12 pessoas?" acao="#" confirmar="Bloquear acesso">
+        <strong class="text-texto">12 pessoas perderão o acesso</strong> às catracas imediatamente. Você pode liberar depois.
     </x-modal-confirmacao>
 
-    <x-modal-confirmacao id="modal-excluir" titulo="Excluir o cliente Construtora Exemplo?" acao="#" metodo="DELETE"
-        confirmar="Excluir definitivamente" digitar="Construtora Exemplo">
-        Esta ação não pode ser desfeita. <strong class="text-texto">Todos os cadastros, regras e históricos</strong> do cliente serão apagados.
+    <x-modal-confirmacao id="modal-desativar" titulo="Desativar o cliente Construtora Exemplo?" acao="#"
+        confirmar="Desativar cliente" digitar="Construtora Exemplo">
+        <strong class="text-texto">1.284 pessoas perderão o acesso</strong> e os usuários do cliente não conseguirão entrar.
+        Nada é apagado: os cadastros e o histórico ficam guardados, e o cliente pode ser reativado.
     </x-modal-confirmacao>
 
     <x-modal-confirmacao id="modal-lote" titulo="Bloquear o acesso das pessoas selecionadas?" acao="#" confirmar="Bloquear acesso">

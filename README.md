@@ -8,6 +8,14 @@ regras de negócio, do banco (RLS, LGPD) e dos testes de segurança.
 **Situação:** Fase 0 do adendo 4A de layout e UX (design system). Ainda não há
 telas de negócio.
 
+## Decisões de produto (adendo 4A)
+
+- **Catracas:** cada cliente tem as próprias catracas, uma ou mais. Não existe o conceito de "unidade". Onde o adendo fala em unidade, vale catraca (ex.: colunas da matriz de regras).
+- **Limite do plano:** quem passa do limite é **notificado** para se ajustar, ou seja, para trocar de plano.
+- **Clientes não são excluídos**, só desativados. Nada é apagado e o cliente pode ser reativado.
+- **Plataforma:** não tem catracas e não vê dispositivos do cliente. Só controla os clientes (dados, plano e cobrança).
+- **Para depois:** chamados, financeiro, fluxo de caixa e NFS-e.
+
 ## Como rodar (desenvolvimento)
 
 Pré-requisitos: PHP 8.5, Composer, Node 20 ou superior.
