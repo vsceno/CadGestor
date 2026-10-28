@@ -22,6 +22,7 @@
     </header>
 
     <main id="conteudo" class="mx-auto flex w-full {{ $largura }} flex-1 flex-col gap-4 px-4 py-6">
+        <x-mensagens-sessao />
         {{ $slot }}
     </main>
 

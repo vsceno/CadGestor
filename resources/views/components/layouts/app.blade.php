@@ -31,6 +31,14 @@
 
 @php
     $recolhido = $preferencias->menuRecolhido;
+
+    // Sem menu explícito: o do usuário logado (App\Support\Navegacao), conforme os papéis dele.
+    if (isset($navegacao)) {
+        $menu = $menu ?: $navegacao['menu'];
+        $atalhos = $atalhos ?: $navegacao['atalhos'];
+        $usuario ??= $navegacao['usuario'];
+        $links = $links ?: $navegacao['links'];
+    }
     $links += ['alertas' => '#', 'perfil' => '#', 'senha' => '#', 'sair' => '#'];
 @endphp
 
@@ -176,6 +184,7 @@
             </header>
 
             <main id="conteudo" class="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-6 px-4 py-6 pb-24 lg:px-8 lg:pb-8">
+                <x-mensagens-sessao />
                 {{ $mensagens ?? '' }}
                 {{ $slot }}
             </main>

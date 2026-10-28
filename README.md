@@ -20,15 +20,34 @@ telas de negócio.
 
 Pré-requisitos: PHP 8.5, Composer, Node 20 ou superior.
 
+Banco: PostgreSQL 18, com dois papéis.
+
+| Papel | Uso | Permissões |
+|---|---|---|
+| `cadgestor_owner` | Dono do schema; só migrações e manutenção | DDL |
+| `cadgestor_app` | Aplicação | Só SELECT/INSERT/UPDATE/DELETE, sujeito ao RLS |
+
+Na primeira instalação, como `postgres`:
+
+```powershell
+psql -h 127.0.0.1 -U postgres -v senha_owner='...' -v senha_app='...' -f database/setup/criar_papeis.sql
+psql -h 127.0.0.1 -U postgres -v banco=cadgestor_v2 -f database/setup/criar_banco.sql
+psql -h 127.0.0.1 -U postgres -v banco=cadgestor_v2_teste -f database/setup/criar_banco.sql
+```
+
 ```bash
 composer install
 npm install
-cp .env.example .env
+cp .env.example .env              # preencha DB_PASSWORD (app) e DB_OWNER_PASSWORD (owner)
 php artisan key:generate
-php artisan migrate
+php artisan migrate --database=pgsql_owner   # migrações SEMPRE com o papel dono
+php artisan plataforma:criar-usuario          # primeiro usuário da plataforma (senha digitada escondida)
 npm run build          # ou "npm run dev" para recarregar ao editar
 php artisan serve      # http://127.0.0.1:8000
 ```
+
+`php artisan banco:recriar` apaga e recria o banco de desenvolvimento. Nunca roda em produção.
+Os testes usam o banco `cadgestor_v2_teste`, recriado a cada execução.
 
 A vitrine do design system fica em **http://127.0.0.1:8000/design-system**. Essa
 página não existe em produção.

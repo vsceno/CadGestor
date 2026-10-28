@@ -27,11 +27,6 @@ class DesignSystemTest extends TestCase
             ->assertDontSee('529.982.247-25');
     }
 
-    public function test_inicio_leva_para_a_vitrine_fora_de_producao(): void
-    {
-        $this->get('/')->assertRedirect(route('design-system.index'));
-    }
-
     public function test_csp_so_permite_recursos_do_proprio_servidor(): void
     {
         $resposta = $this->get(route('design-system.index'));

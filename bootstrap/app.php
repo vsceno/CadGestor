@@ -2,6 +2,8 @@
 
 use App\Http\Middleware\CabecalhosSeguranca;
 use App\Http\Middleware\DefinirContextoBanco;
+use App\Http\Middleware\ExigePapel;
+use App\Http\Middleware\ExigeTrocaSenha;
 use App\Support\PreferenciasInterface;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -23,6 +25,14 @@ return Application::configure(basePath: dirname(__DIR__))
         // Preferências de interface (tema e menu recolhido), gravadas pelo JavaScript.
         // Não contêm dado pessoal; por isso não passam pela cifra de cookies.
         $middleware->encryptCookies(except: [PreferenciasInterface::COOKIE_TEMA, PreferenciasInterface::COOKIE_MENU]);
+
+        $middleware->alias([
+            'papel' => ExigePapel::class,
+            'troca.senha' => ExigeTrocaSenha::class,
+        ]);
+
+        $middleware->redirectGuestsTo(fn () => route('entrar'));
+        $middleware->redirectUsersTo(fn () => route('inicio'));
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(
