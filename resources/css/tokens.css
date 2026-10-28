@@ -1,0 +1,122 @@
+/*
+ * CadGestor - design tokens (fonte única de cores, espaços, raios e sombras).
+ *
+ * Os componentes usam SÓ estes nomes (via Tailwind: bg-superficie, text-suave,
+ * border-borda...). Trocar uma cor aqui muda o sistema todo, nos dois temas.
+ *
+ * Significado fixo das cores (nunca usadas sozinhas: sempre com texto ou ícone):
+ *   verde  = liberado / ativo       (sucesso)
+ *   vermelho = negado / erro        (perigo)
+ *   âmbar  = atenção                (atencao)
+ *   cinza  = inativo / arquivado    (inativo)
+ *   azul   = ação principal         (primaria)
+ *
+ * Contraste: pares texto/fundo escolhidos para no mínimo 4,5:1 (WCAG 2.2 AA).
+ *
+ * Tema: segue o sistema operacional; o usuário pode fixar claro ou escuro
+ * (atributo data-tema no <html>, gravado no navegador).
+ */
+
+:root {
+    color-scheme: light;
+
+    /* Superfícies e texto */
+    --cg-fundo: #f3f5f9;
+    --cg-superficie: #ffffff;
+    --cg-superficie-2: #f7f9fc;
+    --cg-borda: #e2e7ef;
+    --cg-borda-forte: #c5cfdc;
+    --cg-texto: #172033;
+    --cg-suave: #556074;
+
+    /* Ação principal (azul CadGestor) */
+    --cg-primaria: #2453c8;
+    --cg-primaria-hover: #1a3f9e;
+    --cg-primaria-suave: #e9effd;
+    --cg-sobre-primaria: #ffffff;
+
+    /* Significados */
+    --cg-sucesso: #116a3e;
+    --cg-sucesso-suave: #e3f5ea;
+    --cg-perigo: #b42318;
+    --cg-perigo-suave: #fdebe9;
+    --cg-atencao: #7f4d00;
+    --cg-atencao-suave: #fff3d6;
+    --cg-inativo: #4b5565;
+    --cg-inativo-suave: #edf0f4;
+
+    /* Menu lateral */
+    --cg-lateral: #0f1b33;
+    --cg-lateral-texto: #c3cce0;
+    --cg-lateral-ativo: #1d2d52;
+
+    /* Foco visível (anel) */
+    --cg-foco: #2453c8;
+
+    /* Forma */
+    --cg-raio: 0.75rem;
+    --cg-raio-pequeno: 0.5rem;
+    --cg-sombra: 0 1px 2px rgb(16 24 40 / 0.05), 0 1px 3px rgb(16 24 40 / 0.06);
+    --cg-sombra-alta: 0 12px 32px rgb(16 24 40 / 0.14);
+}
+
+/* Tema escuro: pela preferência do sistema (se o usuário não fixou "claro") ou fixado. */
+@media (prefers-color-scheme: dark) {
+    :root:not([data-tema='claro']) {
+        color-scheme: dark;
+        --cg-fundo: #0b1220;
+        --cg-superficie: #121b2f;
+        --cg-superficie-2: #172239;
+        --cg-borda: #253250;
+        --cg-borda-forte: #36456a;
+        --cg-texto: #e7ebf3;
+        --cg-suave: #a5afc4;
+        --cg-primaria: #7b9cff;
+        --cg-primaria-hover: #9bb4ff;
+        --cg-primaria-suave: #1b2a4f;
+        --cg-sobre-primaria: #0b1220;
+        --cg-sucesso: #5ad38f;
+        --cg-sucesso-suave: #10301f;
+        --cg-perigo: #ff8b80;
+        --cg-perigo-suave: #3a1715;
+        --cg-atencao: #f6c25a;
+        --cg-atencao-suave: #35280c;
+        --cg-inativo: #a8b1c2;
+        --cg-inativo-suave: #222c42;
+        --cg-lateral: #0a1120;
+        --cg-lateral-texto: #b5bfd4;
+        --cg-lateral-ativo: #1a2745;
+        --cg-foco: #9bb4ff;
+        --cg-sombra: 0 1px 2px rgb(0 0 0 / 0.4);
+        --cg-sombra-alta: 0 12px 32px rgb(0 0 0 / 0.55);
+    }
+}
+
+:root[data-tema='escuro'] {
+    color-scheme: dark;
+    --cg-fundo: #0b1220;
+    --cg-superficie: #121b2f;
+    --cg-superficie-2: #172239;
+    --cg-borda: #253250;
+    --cg-borda-forte: #36456a;
+    --cg-texto: #e7ebf3;
+    --cg-suave: #a5afc4;
+    --cg-primaria: #7b9cff;
+    --cg-primaria-hover: #9bb4ff;
+    --cg-primaria-suave: #1b2a4f;
+    --cg-sobre-primaria: #0b1220;
+    --cg-sucesso: #5ad38f;
+    --cg-sucesso-suave: #10301f;
+    --cg-perigo: #ff8b80;
+    --cg-perigo-suave: #3a1715;
+    --cg-atencao: #f6c25a;
+    --cg-atencao-suave: #35280c;
+    --cg-inativo: #a8b1c2;
+    --cg-inativo-suave: #222c42;
+    --cg-lateral: #0a1120;
+    --cg-lateral-texto: #b5bfd4;
+    --cg-lateral-ativo: #1a2745;
+    --cg-foco: #9bb4ff;
+    --cg-sombra: 0 1px 2px rgb(0 0 0 / 0.4);
+    --cg-sombra-alta: 0 12px 32px rgb(0 0 0 / 0.55);
+}

@@ -1,30 +1,20 @@
 <?php
 
-/**
- * Front controller: toda requisição HTTP entra por aqui.
- */
+use Illuminate\Foundation\Application;
+use Illuminate\Http\Request;
 
-declare(strict_types=1);
+define('LARAVEL_START', microtime(true));
 
-use CadGestor\Nucleo\Aplicacao;
-use CadGestor\Nucleo\Requisicao;
-
-$raiz = dirname(__DIR__);
-
-require $raiz . '/vendor/autoload.php';
-
-try {
-    $app = Aplicacao::iniciar($raiz);
-} catch (Throwable) {
-    // Falha antes do tratador de erros existir (ex.: .env ausente ou inválido).
-    // Nenhum detalhe é exibido; consulte o README.
-    http_response_code(500);
-    header('Content-Type: text/plain; charset=UTF-8');
-    echo 'CadGestor: configuração inválida ou ausente (.env).';
-    exit;
+// Determine if the application is in maintenance mode...
+if (file_exists($maintenance = __DIR__.'/../storage/framework/maintenance.php')) {
+    require $maintenance;
 }
 
-$app->registrarServicos($raiz . '/config/servicos.php')
-    ->registrarRotas($raiz . '/config/rotas.php')
-    ->atender(Requisicao::daGlobal())
-    ->enviar();
+// Register the Composer autoloader...
+require __DIR__.'/../vendor/autoload.php';
+
+// Bootstrap Laravel and handle the request...
+/** @var Application $app */
+$app = require_once __DIR__.'/../bootstrap/app.php';
+
+$app->handleRequest(Request::capture());

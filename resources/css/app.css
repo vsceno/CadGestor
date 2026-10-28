@@ -1,0 +1,104 @@
+@import '@fontsource-variable/inter';
+@import 'tailwindcss';
+@import './tokens.css';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source not '../../legado';
+
+/*
+ * Ponte entre os tokens (tokens.css) e o Tailwind: cada cor vira utilitário
+ * (bg-superficie, text-suave, border-borda, bg-primaria...). "inline" faz o
+ * Tailwind usar a variável em tempo de execução, então o tema troca sozinho.
+ */
+@theme inline {
+    --font-sans: 'Inter Variable', ui-sans-serif, system-ui, 'Segoe UI', sans-serif;
+
+    --color-fundo: var(--cg-fundo);
+    --color-superficie: var(--cg-superficie);
+    --color-superficie-2: var(--cg-superficie-2);
+    --color-borda: var(--cg-borda);
+    --color-borda-forte: var(--cg-borda-forte);
+    --color-texto: var(--cg-texto);
+    --color-suave: var(--cg-suave);
+    --color-primaria: var(--cg-primaria);
+    --color-primaria-hover: var(--cg-primaria-hover);
+    --color-primaria-suave: var(--cg-primaria-suave);
+    --color-sobre-primaria: var(--cg-sobre-primaria);
+    --color-sucesso: var(--cg-sucesso);
+    --color-sucesso-suave: var(--cg-sucesso-suave);
+    --color-perigo: var(--cg-perigo);
+    --color-perigo-suave: var(--cg-perigo-suave);
+    --color-atencao: var(--cg-atencao);
+    --color-atencao-suave: var(--cg-atencao-suave);
+    --color-inativo: var(--cg-inativo);
+    --color-inativo-suave: var(--cg-inativo-suave);
+    --color-lateral: var(--cg-lateral);
+    --color-lateral-texto: var(--cg-lateral-texto);
+    --color-lateral-ativo: var(--cg-lateral-ativo);
+    --color-foco: var(--cg-foco);
+
+    --radius-cartao: var(--cg-raio);
+    --radius-controle: var(--cg-raio-pequeno);
+    --shadow-cartao: var(--cg-sombra);
+    --shadow-alta: var(--cg-sombra-alta);
+}
+
+/* Variante dark: (para os raros casos fora dos tokens) segue o mesmo critério do tema. */
+@custom-variant dark {
+    &:where([data-tema='escuro'], [data-tema='escuro'] *) {
+        @slot;
+    }
+
+    @media (prefers-color-scheme: dark) {
+        &:where(:root:not([data-tema='claro']), :root:not([data-tema='claro']) *) {
+            @slot;
+        }
+    }
+}
+
+@layer base {
+    html {
+        -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+        @apply bg-fundo font-sans text-[15px] leading-relaxed text-texto antialiased;
+    }
+
+    /* Foco sempre visível no teclado, em qualquer elemento interativo. */
+    :focus-visible {
+        @apply outline-2 outline-offset-2 outline-foco;
+    }
+
+    a {
+        @apply text-primaria underline-offset-2 hover:text-primaria-hover;
+    }
+
+    h1,
+    h2,
+    h3 {
+        @apply font-semibold tracking-tight text-texto;
+    }
+
+    [hidden] {
+        display: none !important;
+    }
+}
+
+@layer components {
+    /* Números alinhados em tabelas e indicadores. */
+    .numeros {
+        font-variant-numeric: tabular-nums;
+    }
+
+    /* Skeleton (estado "carregando"): pulsa, mas respeita quem desativou animações. */
+    .esqueleto {
+        @apply animate-pulse rounded-controle bg-borda motion-reduce:animate-none;
+    }
+
+    /* <dialog> nativo usado pelo componente de modal. */
+    dialog.cg-modal::backdrop {
+        background: rgb(8 12 24 / 0.55);
+    }
+}
