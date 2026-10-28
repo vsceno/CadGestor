@@ -1,7 +1,5 @@
 <?php
 
-use App\Models\User;
-
 return [
 
     /*
@@ -62,9 +60,9 @@ return [
     */
 
     'providers' => [
+        // Usuários em usuario_sistema, localizados respeitando o RLS (App\Auth\ProvedorUsuarios).
         'users' => [
-            'driver' => 'eloquent',
-            'model' => env('AUTH_MODEL', User::class),
+            'driver' => 'cadgestor',
         ],
 
         // 'users' => [

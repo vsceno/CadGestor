@@ -95,7 +95,28 @@ return [
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'search_path' => 'public',
+            'search_path' => 'cadgestor',
+            'sslmode' => env('DB_SSLMODE', 'prefer'),
+        ],
+
+        /*
+         * Papel DONO do schema (cadgestor_owner): só migrações e jobs de
+         * manutenção. A aplicação web e a API usam a conexão "pgsql", com o
+         * papel cadgestor_app, que não altera estrutura e passa pelo RLS.
+         *
+         *   php artisan migrate --database=pgsql_owner
+         */
+        'pgsql_owner' => [
+            'driver' => 'pgsql',
+            'host' => env('DB_HOST', '127.0.0.1'),
+            'port' => env('DB_PORT', '5432'),
+            'database' => env('DB_DATABASE', 'laravel'),
+            'username' => env('DB_OWNER_USERNAME', 'cadgestor_owner'),
+            'password' => env('DB_OWNER_PASSWORD', ''),
+            'charset' => env('DB_CHARSET', 'utf8'),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'search_path' => 'cadgestor',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
         ],
 

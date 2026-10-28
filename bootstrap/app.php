@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Middleware\CabecalhosSeguranca;
+use App\Http\Middleware\DefinirContextoBanco;
 use App\Support\PreferenciasInterface;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -15,6 +16,9 @@ return Application::configure(basePath: dirname(__DIR__))
     )
     ->withMiddleware(function (Middleware $middleware): void {
         $middleware->append(CabecalhosSeguranca::class);
+
+        // Isolamento entre clientes: o banco só enxerga o cliente do usuário logado.
+        $middleware->web(append: [DefinirContextoBanco::class]);
 
         // Preferências de interface (tema e menu recolhido), gravadas pelo JavaScript.
         // Não contêm dado pessoal; por isso não passam pela cifra de cookies.
