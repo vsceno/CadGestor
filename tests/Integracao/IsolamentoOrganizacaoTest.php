@@ -193,6 +193,27 @@ final class IsolamentoOrganizacaoTest extends BancoTestCase
         self::assertSame(0, $this->contar('SELECT count(*) FROM evento_acesso'));
     }
 
+    public function testAssinaturaEFaturasSoDaPropriaOrganizacaoECatalogoSoAPlataformaAltera(): void
+    {
+        self::usarOrganizacao($this->app, null, true);
+        $this->app(<<<'SQL'
+            INSERT INTO assinatura (organizacao_id, plano_id, status)
+            SELECT :o, id, 'ativa' FROM plano WHERE codigo = 'basico'
+            SQL, ['o' => $this->orgA]);
+
+        self::usarOrganizacao($this->app, $this->orgB);
+        self::assertSame(0, $this->contar('SELECT count(*) FROM assinatura'));
+        self::assertSame(3, $this->contar('SELECT count(*) FROM plano'), 'O catálogo de planos é público.');
+
+        // Um cliente não consegue mexer no preço do catálogo.
+        $alteracao = $this->app->prepare('UPDATE plano SET preco_centavos = 1');
+        $alteracao->execute();
+        self::assertSame(0, $alteracao->rowCount());
+
+        self::usarOrganizacao($this->app, $this->orgA);
+        self::assertSame(1, $this->contar('SELECT count(*) FROM assinatura'));
+    }
+
     // ---------------------------------------------------------------------
 
     private function novaEmpresa(): string

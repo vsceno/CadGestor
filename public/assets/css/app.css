@@ -125,18 +125,6 @@ code {
     white-space: nowrap;
 }
 
-/* Modo suporte: a plataforma está dentro de uma organização. */
-.faixa-suporte {
-    background: var(--cor-aviso-fundo);
-    color: var(--cor-aviso);
-    border-bottom: 1px solid var(--cor-borda);
-    padding: 0.5rem 1rem;
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem 1rem;
-}
 
 /* --- Estrutura --------------------------------------------------------- */
 .conteudo {
@@ -569,4 +557,62 @@ code {
     .conta {
         margin-left: 0;
     }
+}
+
+/* --- Planos (cadastro) ---------------------------------------------------- */
+.planos {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 0.75rem;
+}
+
+.formulario .plano-opcao {
+    margin: 0;
+    font-weight: 400;
+    border: 1px solid var(--cor-borda);
+    border-radius: var(--raio);
+    padding: 0.75rem 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.2rem;
+    cursor: pointer;
+}
+
+.formulario .plano-opcao:has(input:checked) {
+    border-color: var(--cor-primaria);
+    box-shadow: 0 0 0 2px var(--cor-info-fundo);
+}
+
+.plano-nome {
+    font-weight: 700;
+}
+
+.plano-preco {
+    font-size: 1.3rem;
+    font-weight: 700;
+    color: var(--cor-primaria);
+}
+
+.plano-limites {
+    color: var(--cor-suave);
+    font-size: 0.9rem;
+}
+
+/* Aviso da assinatura (atraso, fim do teste) no topo das páginas do cliente. */
+.faixa-assinatura {
+    background: var(--cor-aviso-fundo);
+    color: var(--cor-aviso);
+    border-bottom: 1px solid var(--cor-borda);
+    padding: 0.5rem 1rem;
+}
+
+.faixa-assinatura a {
+    color: inherit;
+    font-weight: 600;
+}
+
+/* Documentos jurídicos */
+.documento {
+    max-width: 52rem;
+    line-height: 1.6;
 }

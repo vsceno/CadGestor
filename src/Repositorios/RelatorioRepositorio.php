@@ -131,8 +131,9 @@ final class RelatorioRepositorio
         $consulta = $this->pdo->prepare(<<<SQL
             SELECT a.id, a.data_hora, a.acao, a.tabela, a.registro_id, a.dados_antes::text AS dados_antes,
                    a.dados_depois::text AS dados_depois, host(a.ip) AS ip,
-                   -- Usuário da plataforma (modo suporte): o RLS esconde a conta, mas o cliente sabe quem foi.
-                   COALESCE(u.nome, CASE WHEN a.usuario_id IS NOT NULL THEN 'Suporte da plataforma' END)
+                   -- Usuário da plataforma (ex.: criou o administrador): o RLS esconde a conta,
+                   -- mas o cliente sabe quem foi.
+                   COALESCE(u.nome, CASE WHEN a.usuario_id IS NOT NULL THEN 'Equipe da plataforma' END)
                        AS usuario_nome
               FROM auditoria a LEFT JOIN usuario_sistema u ON u.id = a.usuario_id
               {$where}

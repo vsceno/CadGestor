@@ -7,6 +7,7 @@ namespace CadGestor\Servicos;
 use CadGestor\Banco\ContextoBanco;
 use CadGestor\Banco\Transacao;
 use CadGestor\Nucleo\ErroValidacao;
+use CadGestor\Repositorios\AssinaturaRepositorio;
 use CadGestor\Repositorios\OrganizacaoRepositorio;
 use CadGestor\Seguranca\Papel;
 use PDO;
@@ -22,21 +23,30 @@ final class OrganizacaoServico
     public function __construct(
         private readonly PDO $pdo,
         private readonly OrganizacaoRepositorio $organizacoes,
+        private readonly AssinaturaRepositorio $assinaturas,
         private readonly UsuarioServico $usuarios,
         private readonly ContextoBanco $contextoBanco,
         private readonly Auditoria $auditoria,
     ) {
     }
 
-    /** Cria a organização já com os perfis padrão e o termo modelo. */
-    public function criar(string $nome): string
+    /**
+     * Venda manual (contrato fora do site): cria a organização já com os perfis
+     * padrão, o termo modelo e a assinatura ativa no plano escolhido, sem gateway.
+     */
+    public function criar(string $nome, string $planoId): string
     {
         $nome = $this->validar($nome);
+        $plano = $this->assinaturas->plano($planoId) ?? throw ErroValidacao::campo('plano', 'Escolha um plano.');
 
-        return Transacao::executar($this->pdo, function () use ($nome): string {
+        return Transacao::executar($this->pdo, function () use ($nome, $plano): string {
             $id = $this->organizacoes->inserir($nome);
             $this->organizacoes->provisionar($id);
-            $this->auditoria->registrar('criar', 'organizacao', $id, null, ['nome' => $nome]);
+            $this->assinaturas->inserir((string) $plano['id'], 'ativa', null, $id);
+            $this->auditoria->registrar('criar', 'organizacao', $id, null, [
+                'nome' => $nome,
+                'plano' => $plano['codigo'],
+            ]);
 
             return $id;
         });

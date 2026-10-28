@@ -7,9 +7,8 @@ namespace CadGestor\Seguranca;
 /**
  * Usuário logado na requisição atual.
  *
- * $organizacaoId é a organização em que ele está trabalhando: a dele, ou, para
- * um usuário da plataforma, a organização em que entrou em modo suporte
- * (null = modo plataforma, fora de qualquer organização).
+ * $organizacaoId é a organização do usuário (null = usuário da plataforma,
+ * que nunca opera dentro de uma organização).
  */
 final readonly class UsuarioAutenticado
 {
@@ -47,12 +46,6 @@ final readonly class UsuarioAutenticado
     public function emModoPlataforma(): bool
     {
         return $this->daPlataforma && $this->organizacaoId === null;
-    }
-
-    /** Usuário da plataforma atuando dentro de uma organização. */
-    public function emModoSuporte(): bool
-    {
-        return $this->daPlataforma && $this->organizacaoId !== null;
     }
 
     public function primeiroNome(): string

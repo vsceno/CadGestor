@@ -27,6 +27,7 @@ $menu = [
     ['Termos LGPD', '/termos', [Papel::Administrador]],
     ['Usuários', '/usuarios', [Papel::Administrador]],
     ['Auditoria', '/auditoria', [Papel::Administrador]],
+    ['Minha assinatura', '/assinatura', [Papel::Administrador]],
 ];
 
 if (\CadGestor\Nucleo\Visao::compartilhado('simulador_disponivel', false)) {
@@ -35,7 +36,7 @@ if (\CadGestor\Nucleo\Visao::compartilhado('simulador_disponivel', false)) {
 
 // Modo plataforma: fora de qualquer organização, só a gestão de organizações.
 if ($usuario?->emModoPlataforma()) {
-    $menu = [['Organizações', '/organizacoes', [Papel::Plataforma]]];
+    $menu = [['Clientes', '/organizacoes', [Papel::Plataforma]], ['Planos', '/planos', [Papel::Plataforma]]];
 }
 
 $itensVisiveis = $usuario === null || $usuario->deveTrocarSenha ? [] : array_filter(
@@ -79,14 +80,10 @@ $itensVisiveis = $usuario === null || $usuario->deveTrocarSenha ? [] : array_fil
             </div>
         <?php endif; ?>
     </header>
-    <?php if ($usuario?->emModoSuporte()) : ?>
-        <div class="faixa-suporte" role="status">
-            <span>Modo suporte em <strong><?= e($usuario->organizacaoNome) ?></strong>: suas ações ficam
-                registradas na auditoria desta organização.</span>
-            <form method="post" action="/suporte/sair" class="form-inline">
-                <?= csrf_campo() ?>
-                <button type="submit" class="botao">Sair da organização</button>
-            </form>
+    <?php $situacaoAssinatura = \CadGestor\Nucleo\Visao::compartilhado('situacao_assinatura'); ?>
+    <?php if ($situacaoAssinatura?->aviso !== null && $caminhoAtual !== '/assinatura') : ?>
+        <div class="faixa-assinatura" role="status">
+            <?= e($situacaoAssinatura->aviso) ?> <a href="/assinatura">Minha assinatura</a>
         </div>
     <?php endif; ?>
     <main class="conteudo">

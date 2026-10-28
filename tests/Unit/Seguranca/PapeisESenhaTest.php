@@ -44,14 +44,11 @@ final class PapeisESenhaTest extends TestCase
 
     public function testModosDoUsuarioDaPlataforma(): void
     {
-        $foraDeOrganizacao = new UsuarioAutenticado('id', 'Ana', 'a@exemplo.com', [Papel::Plataforma], false, null, null, true);
-        $emSuporte = new UsuarioAutenticado('id', 'Ana', 'a@exemplo.com', [Papel::Administrador], false, 'org', 'X', true);
+        $plataforma = new UsuarioAutenticado('id', 'Ana', 'a@exemplo.com', [Papel::Plataforma], false, null, null, true);
 
-        self::assertTrue($foraDeOrganizacao->emModoPlataforma());
-        self::assertFalse($foraDeOrganizacao->temPapel(Papel::Administrador));
-        self::assertTrue($emSuporte->emModoSuporte());
-        self::assertFalse($emSuporte->temPapel(Papel::Plataforma));
-        self::assertFalse($this->usuario(Papel::Administrador)->emModoSuporte());
+        self::assertTrue($plataforma->emModoPlataforma());
+        self::assertFalse($plataforma->temPapel(Papel::Administrador), 'A plataforma não opera no ambiente do cliente.');
+        self::assertFalse($this->usuario(Papel::Administrador)->emModoPlataforma());
     }
 
     #[DataProvider('senhas')]

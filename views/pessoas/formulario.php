@@ -19,6 +19,11 @@ $telefone = (string) ($dados['telefone'] ?? '');
         <div class="alerta alerta-erro" role="alert">Corrija os campos destacados.</div>
     <?php endif; ?>
 
+    <?php if (isset($erros['plano'])) : ?>
+        <div class="alerta alerta-erro" role="alert">
+            <?= e($erros['plano']) ?> <a href="/assinatura">Minha assinatura</a>
+        </div>
+    <?php endif; ?>
     <form method="post" action="<?= $id === null ? '/pessoas' : '/pessoas/' . e($id) ?>" class="formulario" autocomplete="off">
         <?= csrf_campo() ?>
 

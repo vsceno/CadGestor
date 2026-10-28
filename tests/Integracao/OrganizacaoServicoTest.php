@@ -7,6 +7,7 @@ namespace CadGestor\Testes\Integracao;
 use CadGestor\Banco\ContextoBanco;
 use CadGestor\Nucleo\Contexto;
 use CadGestor\Nucleo\ErroValidacao;
+use CadGestor\Repositorios\AssinaturaRepositorio;
 use CadGestor\Repositorios\OrganizacaoRepositorio;
 use CadGestor\Repositorios\UsuarioRepositorio;
 use CadGestor\Seguranca\HashSenha;
@@ -30,6 +31,7 @@ final class OrganizacaoServicoTest extends BancoTestCase
         $this->servico = new OrganizacaoServico(
             $this->pdo,
             new OrganizacaoRepositorio($this->pdo),
+            new AssinaturaRepositorio($this->pdo),
             new UsuarioServico($this->pdo, new UsuarioRepositorio($this->pdo), new HashSenha(), $auditoria),
             $this->contextoBanco,
             $auditoria,
@@ -41,11 +43,12 @@ final class OrganizacaoServicoTest extends BancoTestCase
 
     public function testOrganizacaoNasceComPerfisPadraoETermoModelo(): void
     {
-        $id = $this->servico->criar('  Condomínio   Solar ');
+        $id = $this->servico->criar('  Condomínio   Solar ', $this->plano('basico'));
 
         self::assertSame('Condomínio Solar', $this->valor('SELECT nome FROM organizacao WHERE id = :id', $id));
         self::assertSame(4, (int) $this->valor('SELECT count(*) FROM perfil_vinculo WHERE organizacao_id = :id', $id));
         self::assertSame('1.0', $this->valor('SELECT versao FROM termo_consentimento WHERE organizacao_id = :id', $id));
+        self::assertSame('ativa', $this->valor('SELECT status FROM assinatura WHERE organizacao_id = :id', $id));
         self::assertNull(
             $this->valor("SELECT organizacao_id FROM auditoria WHERE registro_id = :id AND acao = 'criar'", $id),
             'Criação de organização é ação da plataforma.',
@@ -54,15 +57,15 @@ final class OrganizacaoServicoTest extends BancoTestCase
 
     public function testNomeDuplicadoERecusado(): void
     {
-        $this->servico->criar('Condomínio Solar');
+        $this->servico->criar('Condomínio Solar', $this->plano('basico'));
 
         $this->expectException(ErroValidacao::class);
-        $this->servico->criar('condomínio solar');
+        $this->servico->criar('condomínio solar', $this->plano('basico'));
     }
 
     public function testAdministradorECriadoDentroDaOrganizacao(): void
     {
-        $id = $this->servico->criar('Condomínio Solar');
+        $id = $this->servico->criar('Condomínio Solar', $this->plano('basico'));
         $admin = $this->servico->criarAdministrador($id, 'Síndica Teste', 'sindica@exemplo.com');
 
         self::assertSame($id, $this->valor('SELECT organizacao_id FROM usuario_sistema WHERE id = :id', $admin['id']));
@@ -79,10 +82,15 @@ final class OrganizacaoServicoTest extends BancoTestCase
 
     public function testDesativarOrganizacao(): void
     {
-        $id = $this->servico->criar('Condomínio Solar');
+        $id = $this->servico->criar('Condomínio Solar', $this->plano('basico'));
         $this->servico->alterarSituacao($id, false);
 
         self::assertFalse($this->valor('SELECT ativo FROM organizacao WHERE id = :id', $id));
+    }
+
+    private function plano(string $codigo): string
+    {
+        return (string) $this->pdo->query("SELECT id FROM plano WHERE codigo = '{$codigo}'")->fetchColumn();
     }
 
     private function valor(string $sql, string $id): mixed

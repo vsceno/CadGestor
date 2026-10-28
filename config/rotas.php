@@ -11,6 +11,11 @@
 declare(strict_types=1);
 
 use CadGestor\Http\Controllers\AlertaController;
+use CadGestor\Http\Controllers\ApiPagamentoController;
+use CadGestor\Http\Controllers\AssinaturaController;
+use CadGestor\Http\Controllers\CadastroController;
+use CadGestor\Http\Controllers\PagamentoSimuladoController;
+use CadGestor\Http\Controllers\PlanoController;
 use CadGestor\Http\Controllers\ApiCatracaController;
 use CadGestor\Http\Controllers\AuditoriaController;
 use CadGestor\Http\Controllers\AutenticacaoController;
@@ -32,6 +37,7 @@ use CadGestor\Http\Middleware\ExigeAutenticacao;
 use CadGestor\Http\Middleware\ExigePapel;
 use CadGestor\Http\Middleware\IniciaSessao;
 use CadGestor\Http\Middleware\Preguicoso;
+use CadGestor\Http\Middleware\VerificaAssinatura;
 use CadGestor\Http\Middleware\VerificaCsrf;
 use CadGestor\Nucleo\Aplicacao;
 use CadGestor\Nucleo\Container;
@@ -42,6 +48,7 @@ use CadGestor\Seguranca\Autenticacao;
 use CadGestor\Seguranca\Csrf;
 use CadGestor\Seguranca\Papel;
 use CadGestor\Seguranca\Sessao;
+use CadGestor\Servicos\AssinaturaServico;
 
 return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
     // Controllers e middlewares são criados só quando a rota é chamada.
@@ -55,6 +62,11 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
     ));
     $csrf = new Preguicoso(static fn (): VerificaCsrf => new VerificaCsrf($c->obter(Csrf::class)));
     $logado = new Preguicoso(static fn (): ExigeAutenticacao => new ExigeAutenticacao($c->obter(Autenticacao::class)));
+    $assinatura = new Preguicoso(static fn (): VerificaAssinatura => new VerificaAssinatura(
+        $c->obter(Autenticacao::class),
+        $c->obter(AssinaturaServico::class),
+        $c->obter(Sessao::class),
+    ));
     $papel = static fn (Papel ...$papeis): Preguicoso => new Preguicoso(
         static fn (): ExigePapel => new ExigePapel($c->obter(Autenticacao::class), ...$papeis),
     );
@@ -69,21 +81,61 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
     $rotas->post('/api/v1/sincronizacao/{id}', $acao(ApiCatracaController::class, 'confirmarSincronizacao'));
     $rotas->post('/api/v1/eventos-offline', $acao(ApiCatracaController::class, 'eventosOffline'));
 
+    // --- Avisos do gateway de pagamento (autenticidade conferida pelo adaptador)
+    $rotas->post('/api/v1/pagamentos/webhook', $acao(ApiPagamentoController::class, 'webhook'));
+
     // --- Web (com sessão e CSRF) ------------------------------------------
-    $rotas->grupo([$sessao, $csrf], static function (Roteador $rotas) use ($acao, $logado, $papel, $app): void {
+    $rotas->grupo([$sessao, $csrf], static function (Roteador $rotas) use (
+        $acao,
+        $logado,
+        $assinatura,
+        $papel,
+        $app,
+    ): void {
         $rotas->get('/', static fn (): Resposta => Resposta::redirecionar('/painel'));
         $rotas->get('/login', $acao(AutenticacaoController::class, 'formulario'));
         $rotas->post('/login', $acao(AutenticacaoController::class, 'entrar'));
 
-        $rotas->grupo([$logado], static function (Roteador $rotas) use ($acao, $papel, $app): void {
+        // Loja pública: contratação self-service e documentos jurídicos.
+        $rotas->get('/cadastro', $acao(CadastroController::class, 'formulario'));
+        $rotas->post('/cadastro', $acao(CadastroController::class, 'cadastrar'));
+        $rotas->get('/confirmar-email', $acao(CadastroController::class, 'confirmarEmail'));
+        $rotas->get('/termos-de-uso', $acao(CadastroController::class, 'documento'));
+        $rotas->get('/privacidade', $acao(CadastroController::class, 'documento'));
+        $rotas->get('/contrato-dados', $acao(CadastroController::class, 'documento'));
+
+        $rotas->grupo([$logado, $assinatura], static function (Roteador $rotas) use ($acao, $papel, $app): void {
+            // --- Minha assinatura (abre mesmo com o sistema suspenso) ------
+            // Qualquer usuário de organização vê; a plataforma não (não tem organização).
+            $rotas->get(
+                '/assinatura',
+                $acao(AssinaturaController::class, 'index'),
+                [$papel(...Papel::daOrganizacao())],
+            );
+            $rotas->grupo([$papel(Papel::Administrador)], static function (Roteador $rotas) use ($acao, $app): void {
+                $rotas->post('/assinatura/plano', $acao(AssinaturaController::class, 'trocarPlano'));
+                $rotas->post('/assinatura/cancelar', $acao(AssinaturaController::class, 'cancelar'));
+                $rotas->get('/assinatura/exportar', $acao(AssinaturaController::class, 'exportar'));
+
+                if (!$app->ambiente->emProducao()) {
+                    $rotas->get('/pagamento-simulado/{id}', $acao(PagamentoSimuladoController::class, 'ver'));
+                    $rotas->post('/pagamento-simulado/{id}', $acao(PagamentoSimuladoController::class, 'executar'));
+                }
+            });
+
             $rotas->post('/sair', $acao(AutenticacaoController::class, 'sair'));
             $rotas->get('/senha', $acao(AutenticacaoController::class, 'formularioSenha'));
             $rotas->post('/senha', $acao(AutenticacaoController::class, 'trocarSenha'));
             $rotas->get('/painel', $acao(PainelController::class, 'index'));
-            $rotas->post('/suporte/sair', $acao(OrganizacaoController::class, 'sairDoSuporte'));
 
-            // --- Plataforma: organizações (clientes) e modo suporte --------
+            // --- Plataforma: organizações (clientes), planos e assinaturas -
             $rotas->grupo([$papel(Papel::Plataforma)], static function (Roteador $rotas) use ($acao): void {
+                $rotas->get('/planos', $acao(PlanoController::class, 'index'));
+                $rotas->get('/planos/novo', $acao(PlanoController::class, 'novo'));
+                $rotas->post('/planos', $acao(PlanoController::class, 'criar'));
+                $rotas->get('/planos/{id}/editar', $acao(PlanoController::class, 'editar'));
+                $rotas->post('/planos/{id}', $acao(PlanoController::class, 'atualizar'));
+
                 $rotas->get('/organizacoes', $acao(OrganizacaoController::class, 'index'));
                 $rotas->get('/organizacoes/nova', $acao(OrganizacaoController::class, 'novo'));
                 $rotas->post('/organizacoes', $acao(OrganizacaoController::class, 'criar'));
@@ -95,7 +147,6 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
                     '/organizacoes/{id}/administradores',
                     $acao(OrganizacaoController::class, 'criarAdministrador'),
                 );
-                $rotas->post('/organizacoes/{id}/entrar', $acao(OrganizacaoController::class, 'entrar'));
             });
 
             // --- Alertas: consulta vê, administrador trata ------------------

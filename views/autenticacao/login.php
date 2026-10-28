@@ -22,4 +22,5 @@
 
         <button type="submit" class="botao botao-primario">Entrar</button>
     </form>
+    <p class="dica">Ainda não é cliente? <a href="/cadastro">Contrate o CadGestor</a> com teste grátis.</p>
 </section>

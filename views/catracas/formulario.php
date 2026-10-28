@@ -24,6 +24,11 @@ $v = static fn (string $campo): string => e($dados[$campo] ?? '');
         </p>
     <?php endif; ?>
 
+    <?php if (isset($erros['plano'])) : ?>
+        <div class="alerta alerta-erro" role="alert">
+            <?= e($erros['plano']) ?> <a href="/assinatura">Minha assinatura</a>
+        </div>
+    <?php endif; ?>
     <form method="post" action="<?= $id === null ? '/catracas' : '/catracas/' . e($id) ?>" class="formulario">
         <?= csrf_campo() ?>
 

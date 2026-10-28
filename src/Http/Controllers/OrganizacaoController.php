@@ -4,18 +4,21 @@ declare(strict_types=1);
 
 namespace CadGestor\Http\Controllers;
 
+use CadGestor\Dominio\SituacaoAssinatura;
 use CadGestor\Nucleo\ErroValidacao;
 use CadGestor\Nucleo\Requisicao;
 use CadGestor\Nucleo\Resposta;
+use CadGestor\Repositorios\AssinaturaRepositorio;
 use CadGestor\Repositorios\OrganizacaoRepositorio;
 use CadGestor\Repositorios\UsuarioRepositorio;
-use CadGestor\Seguranca\Autenticacao;
 use CadGestor\Seguranca\Sessao;
 use CadGestor\Servicos\OrganizacaoServico;
+use DateTimeImmutable;
 
 /**
- * Painel da plataforma: organizações (clientes), seus administradores e o
- * modo suporte (entrar numa organização).
+ * Painel comercial da plataforma: clientes (organizações), plano, situação da
+ * assinatura e faturas. A plataforma NÃO entra no ambiente do cliente: daqui
+ * só se veem contagens e dados comerciais.
  */
 final class OrganizacaoController extends Controlador
 {
@@ -23,8 +26,8 @@ final class OrganizacaoController extends Controlador
         Sessao $sessao,
         private readonly OrganizacaoRepositorio $organizacoes,
         private readonly UsuarioRepositorio $usuarios,
+        private readonly AssinaturaRepositorio $assinaturas,
         private readonly OrganizacaoServico $servico,
-        private readonly Autenticacao $autenticacao,
     ) {
         parent::__construct($sessao);
     }
@@ -32,32 +35,59 @@ final class OrganizacaoController extends Controlador
     /** @param array<string, string> $parametros */
     public function index(Requisicao $requisicao, array $parametros): Resposta
     {
+        $hoje = new DateTimeImmutable('today');
+        $assinaturas = $this->assinaturas->resumoPorOrganizacao();
+        $organizacoes = [];
+        $indicadores = ['receita_mensal' => 0, 'ativas' => 0, 'teste' => 0, 'inadimplentes' => 0, 'canceladas' => 0];
+
+        foreach ($this->organizacoes->listarComResumo() as $o) {
+            $a = $assinaturas[$o['id']] ?? null;
+            $o['assinatura'] = $a;
+            $o['situacao'] = $a === null
+                ? SituacaoAssinatura::semAssinatura()
+                : SituacaoAssinatura::calcular($a['status'], $a['teste_ate'], $a['inadimplente_desde'], $hoje);
+            $organizacoes[] = $o;
+
+            match ($a['status'] ?? null) {
+                'ativa' => $indicadores['ativas']++,
+                'teste' => $indicadores['teste']++,
+                'inadimplente' => $indicadores['inadimplentes']++,
+                'cancelada' => $indicadores['canceladas']++,
+                default => null,
+            };
+
+            if (in_array($a['status'] ?? null, ['ativa', 'inadimplente'], true) && $o['ativo']) {
+                $indicadores['receita_mensal'] += (int) $a['preco_centavos'];
+            }
+        }
+
         return $this->pagina('organizacoes/index', [
-            'titulo' => 'Organizações',
-            'organizacoes' => $this->organizacoes->listarComResumo(),
+            'titulo' => 'Clientes',
+            'organizacoes' => $organizacoes,
+            'indicadores' => $indicadores,
         ]);
     }
 
     /** @param array<string, string> $parametros */
     public function novo(Requisicao $requisicao, array $parametros): Resposta
     {
-        return $this->formulario(null, ['nome' => ''], []);
+        return $this->formulario(null, ['nome' => '', 'plano_id' => ''], []);
     }
 
     /** @param array<string, string> $parametros */
     public function criar(Requisicao $requisicao, array $parametros): Resposta
     {
-        $nome = $requisicao->entrada('nome');
+        $dados = ['nome' => $requisicao->entrada('nome'), 'plano_id' => $requisicao->entrada('plano_id')];
 
         try {
-            $id = $this->servico->criar($nome);
+            $id = $this->servico->criar($dados['nome'], $dados['plano_id']);
         } catch (ErroValidacao $erro) {
-            return $this->formulario(null, ['nome' => $nome], $erro->erros, 422);
+            return $this->formulario(null, $dados, $erro->erros, 422);
         }
 
         return $this->redirecionar(
             '/organizacoes/' . $id,
-            'Organização criada com os perfis padrão e o termo modelo. Agora cadastre o administrador dela.',
+            'Cliente criado com a assinatura ativa. Agora cadastre o administrador dele.',
         );
     }
 
@@ -88,7 +118,7 @@ final class OrganizacaoController extends Controlador
                 : $this->formulario($parametros['id'], ['nome' => $nome], $erro->erros, 422);
         }
 
-        return $this->redirecionar('/organizacoes/' . $parametros['id'], 'Organização atualizada.');
+        return $this->redirecionar('/organizacoes/' . $parametros['id'], 'Cliente atualizado.');
     }
 
     /** @param array<string, string> $parametros */
@@ -103,8 +133,8 @@ final class OrganizacaoController extends Controlador
         }
 
         return $this->redirecionar('/organizacoes/' . $parametros['id'], $ativo
-            ? 'Organização reativada.'
-            : 'Organização desativada: seus usuários não entram e suas catracas são recusadas.');
+            ? 'Cliente reativado.'
+            : 'Cliente bloqueado: os usuários dele não entram e as catracas são recusadas.');
     }
 
     /** @param array<string, string> $parametros */
@@ -129,30 +159,6 @@ final class OrganizacaoController extends Controlador
     }
 
     /**
-     * Modo suporte: passa a operar dentro da organização (registrado na
-     * auditoria dela).
-     *
-     * @param array<string, string> $parametros
-     */
-    public function entrar(Requisicao $requisicao, array $parametros): Resposta
-    {
-        if (!$this->autenticacao->entrarNaOrganizacao($parametros['id'])) {
-            return $this->naoEncontrado();
-        }
-
-        return $this->redirecionar('/painel', 'Modo suporte: você está dentro da organização. '
-            . 'Tudo o que fizer fica registrado na auditoria dela.', 'aviso');
-    }
-
-    /** @param array<string, string> $parametros */
-    public function sairDoSuporte(Requisicao $requisicao, array $parametros): Resposta
-    {
-        $this->autenticacao->sairDaOrganizacao();
-
-        return $this->redirecionar('/organizacoes', 'Você saiu do modo suporte.');
-    }
-
-    /**
      * @param array<string, string> $novoAdmin
      * @param array<string, string> $erros
      */
@@ -164,9 +170,19 @@ final class OrganizacaoController extends Controlador
             return $this->naoEncontrado();
         }
 
+        $assinatura = $this->assinaturas->daOrganizacao($id);
+
         return $this->pagina('organizacoes/detalhe', [
             'titulo' => (string) $organizacao['nome'],
             'organizacao' => $organizacao,
+            'assinatura' => $assinatura,
+            'situacao' => $assinatura === null ? SituacaoAssinatura::semAssinatura() : SituacaoAssinatura::calcular(
+                (string) $assinatura['status'],
+                $assinatura['teste_ate'],
+                $assinatura['inadimplente_desde'],
+                new DateTimeImmutable('today'),
+            ),
+            'faturas' => $this->assinaturas->faturas($id),
             'usuarios' => $this->usuarios->listar($id),
             'novoAdmin' => $novoAdmin,
             'erros' => $erros,
@@ -180,10 +196,11 @@ final class OrganizacaoController extends Controlador
     private function formulario(?string $id, array $dados, array $erros, int $status = 200): Resposta
     {
         return $this->pagina('organizacoes/formulario', [
-            'titulo' => $id === null ? 'Nova organização' : 'Editar organização',
+            'titulo' => $id === null ? 'Novo cliente (venda manual)' : 'Editar cliente',
             'id' => $id,
             'dados' => $dados,
             'erros' => $erros,
+            'planos' => $this->assinaturas->planos(),
         ], $status);
     }
 }

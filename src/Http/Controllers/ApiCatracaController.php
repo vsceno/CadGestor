@@ -11,6 +11,7 @@ use CadGestor\Biometria\TipoBiometria;
 use CadGestor\Nucleo\Requisicao;
 use CadGestor\Nucleo\Resposta;
 use CadGestor\Repositorios\CatracaRepositorio;
+use CadGestor\Servicos\AssinaturaServico;
 use CadGestor\Servicos\CatracaServico;
 
 /**
@@ -27,6 +28,7 @@ final class ApiCatracaController
         private readonly ContextoBanco $contextoBanco,
         private readonly AcessoServico $acesso,
         private readonly SincronizacaoDispositivo $sincronizacao,
+        private readonly AssinaturaServico $assinaturas,
         private readonly float $limiarConfianca,
         private readonly string $fuso,
     ) {
@@ -177,6 +179,15 @@ final class ApiCatracaController
             if ($conta !== null) {
                 $this->contextoBanco->definir($conta['organizacao_id']);
                 $catraca = $this->catracas->buscar($conta['catraca_id']);
+
+                // Assinatura cancelada ou com 30+ dias de atraso: catracas param (régua em SituacaoAssinatura).
+                if ($catraca !== null && !$this->assinaturas->situacao()->catracasLiberadas()) {
+                    return self::erro(
+                        403,
+                        'assinatura_bloqueada',
+                        'Organização bloqueada por pagamento ou cancelamento.',
+                    );
+                }
 
                 if ($catraca !== null) {
                     return $catraca;

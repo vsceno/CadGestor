@@ -6,7 +6,22 @@
 
 declare(strict_types=1);
 
+use CadGestor\Cobranca\GatewayPagamento;
+use CadGestor\Cobranca\GatewaySimulado;
 use CadGestor\Http\Controllers\AlertaController;
+use CadGestor\Http\Controllers\ApiPagamentoController;
+use CadGestor\Http\Controllers\AssinaturaController;
+use CadGestor\Http\Controllers\CadastroController;
+use CadGestor\Http\Controllers\PagamentoSimuladoController;
+use CadGestor\Http\Controllers\PlanoController;
+use CadGestor\Mensagens\Mensageiro;
+use CadGestor\Mensagens\MensageiroArquivo;
+use CadGestor\Repositorios\AssinaturaRepositorio;
+use CadGestor\Servicos\AssinaturaServico;
+use CadGestor\Servicos\CadastroClienteServico;
+use CadGestor\Servicos\LimitesPlano;
+use CadGestor\Servicos\PagamentoServico;
+use CadGestor\Servicos\PlanoServico;
 use CadGestor\Http\Controllers\ApiCatracaController;
 use CadGestor\Http\Controllers\AuditoriaController;
 use CadGestor\Http\Controllers\AutenticacaoController;
@@ -100,6 +115,7 @@ return static function (Container $c, Aplicacao $app): void {
             UsuarioRepositorio::class, EmpresaRepositorio::class, PerfilRepositorio::class,
             CatracaRepositorio::class, RegraAcessoRepositorio::class, PessoaRepositorio::class,
             VinculoRepositorio::class, LgpdRepositorio::class, EventoRepositorio::class, OrganizacaoRepositorio::class,
+            AssinaturaRepositorio::class,
         ] as $repositorio
     ) {
         $c->registrar($repositorio, static fn (): object => new $repositorio($pdo()));
@@ -122,6 +138,7 @@ return static function (Container $c, Aplicacao $app): void {
         $c->obter(CatracaRepositorio::class),
         $c->obter(EmpresaRepositorio::class),
         $c->obter(Auditoria::class),
+        $c->obter(LimitesPlano::class),
     ));
     $c->registrar(RegraAcessoServico::class, static fn (Container $c): RegraAcessoServico => new RegraAcessoServico(
         $pdo(),
@@ -140,6 +157,7 @@ return static function (Container $c, Aplicacao $app): void {
     $c->registrar(OrganizacaoServico::class, static fn (Container $c): OrganizacaoServico => new OrganizacaoServico(
         $pdo(),
         $c->obter(OrganizacaoRepositorio::class),
+        $c->obter(AssinaturaRepositorio::class),
         $c->obter(UsuarioServico::class),
         $c->obter(ContextoBanco::class),
         $c->obter(Auditoria::class),
@@ -150,6 +168,7 @@ return static function (Container $c, Aplicacao $app): void {
         $pdo(),
         $c->obter(PessoaRepositorio::class),
         $c->obter(Auditoria::class),
+        $c->obter(LimitesPlano::class),
     ));
     $c->registrar(VinculoServico::class, static fn (Container $c): VinculoServico => new VinculoServico(
         $pdo(),
@@ -158,6 +177,82 @@ return static function (Container $c, Aplicacao $app): void {
         $c->obter(Auditoria::class),
         $c->obter(SincronizacaoServico::class),
     ));
+
+    // --- Comercial: planos, assinatura, cobrança e cadastro self-service -----
+    $c->registrar(GatewayPagamento::class, static function () use ($ambiente): GatewayPagamento {
+        // Ponto de extensão: o adaptador do gateway real entra aqui (src/Cobranca/Adaptadores).
+        return match ($ambiente->texto('PAGAMENTO_GATEWAY', 'simulado')) {
+            'simulado' => $ambiente->emProducao()
+                ? throw new RuntimeException('O gateway simulado não pode ser usado em produção.')
+                : new GatewaySimulado($ambiente->texto('PAGAMENTO_WEBHOOK_TOKEN', '')),
+            default => throw new RuntimeException('Gateway de pagamento desconhecido.'),
+        };
+    });
+    $c->registrar(Mensageiro::class, static function () use ($ambiente, $app): Mensageiro {
+        return match ($ambiente->texto('MENSAGEIRO', 'arquivo')) {
+            'arquivo' => $ambiente->emProducao()
+                ? throw new RuntimeException('O mensageiro de arquivo não pode ser usado em produção.')
+                : new MensageiroArquivo($app->raiz . '/storage/emails'),
+            default => throw new RuntimeException('Mensageiro desconhecido.'),
+        };
+    });
+    $c->registrar(LimitesPlano::class, static fn (Container $c): LimitesPlano =>
+        new LimitesPlano($c->obter(AssinaturaRepositorio::class)));
+    $c->registrar(AssinaturaServico::class, static fn (Container $c): AssinaturaServico => new AssinaturaServico(
+        $pdo(),
+        $c->obter(AssinaturaRepositorio::class),
+        $c->obter(GatewayPagamento::class),
+        $c->obter(Auditoria::class),
+    ));
+    $c->registrar(PagamentoServico::class, static fn (Container $c): PagamentoServico => new PagamentoServico(
+        $pdo(),
+        $c->obter(AssinaturaRepositorio::class),
+        $c->obter(ContextoBanco::class),
+        $c->obter(Auditoria::class),
+    ));
+    $c->registrar(PlanoServico::class, static fn (Container $c): PlanoServico => new PlanoServico(
+        $pdo(),
+        $c->obter(AssinaturaRepositorio::class),
+        $c->obter(Auditoria::class),
+    ));
+    $c->registrar(CadastroClienteServico::class, static fn (Container $c): CadastroClienteServico =>
+        new CadastroClienteServico(
+            $pdo(),
+            $c->obter(OrganizacaoRepositorio::class),
+            $c->obter(UsuarioRepositorio::class),
+            $c->obter(AssinaturaRepositorio::class),
+            $c->obter(GatewayPagamento::class),
+            $c->obter(ContextoBanco::class),
+            $c->obter(HashSenha::class),
+            $c->obter(Mensageiro::class),
+            $c->obter(Auditoria::class),
+            $ambiente->texto('APP_URL'),
+        ));
+    $c->registrar(PlanoController::class, static fn (Container $c): PlanoController => new PlanoController(
+        $c->obter(Sessao::class),
+        $c->obter(AssinaturaRepositorio::class),
+        $c->obter(PlanoServico::class),
+    ));
+    $c->registrar(AssinaturaController::class, static fn (Container $c): AssinaturaController =>
+        new AssinaturaController(
+            $c->obter(Sessao::class),
+            $c->obter(AssinaturaRepositorio::class),
+            $c->obter(AssinaturaServico::class),
+        ));
+    $c->registrar(CadastroController::class, static fn (Container $c): CadastroController => new CadastroController(
+        $c->obter(Sessao::class),
+        $c->obter(AssinaturaRepositorio::class),
+        $c->obter(CadastroClienteServico::class),
+        $c->obter(LimitadorTentativas::class),
+    ));
+    $c->registrar(ApiPagamentoController::class, static fn (Container $c): ApiPagamentoController =>
+        new ApiPagamentoController($c->obter(GatewayPagamento::class), $c->obter(PagamentoServico::class)));
+    $c->registrar(PagamentoSimuladoController::class, static fn (Container $c): PagamentoSimuladoController =>
+        new PagamentoSimuladoController(
+            $c->obter(Sessao::class),
+            $c->obter(AssinaturaRepositorio::class),
+            $c->obter(PagamentoServico::class),
+        ));
 
     // --- Biometria e LGPD ----------------------------------------------------
     $c->registrar(IdentificadorBiometrico::class, static function () use ($ambiente): IdentificadorBiometrico {
@@ -244,8 +339,8 @@ return static function (Container $c, Aplicacao $app): void {
             $c->obter(Sessao::class),
             $c->obter(OrganizacaoRepositorio::class),
             $c->obter(UsuarioRepositorio::class),
+            $c->obter(AssinaturaRepositorio::class),
             $c->obter(OrganizacaoServico::class),
-            $c->obter(Autenticacao::class),
         ));
     $c->registrar(PerfilController::class, static fn (Container $c): PerfilController => new PerfilController(
         $c->obter(Sessao::class),
@@ -294,6 +389,7 @@ return static function (Container $c, Aplicacao $app): void {
             $c->obter(ContextoBanco::class),
             $c->obter(AcessoServico::class),
             $c->obter(SincronizacaoDispositivo::class),
+            $c->obter(AssinaturaServico::class),
             (float) $ambiente->texto('LIMIAR_CONFIANCA', '0.80'),
             $ambiente->texto('APP_FUSO'),
         ));

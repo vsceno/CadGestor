@@ -134,7 +134,7 @@ final class AutenticacaoTest extends BancoTestCase
         self::assertSame(Autenticacao::FALHA, $this->autenticacao->entrar('operador@exemplo.com', self::SENHA));
     }
 
-    public function testUsuarioDaPlataformaEntraForaDeOrganizacaoEUsaModoSuporte(): void
+    public function testUsuarioDaPlataformaSoOperaForaDasOrganizacoes(): void
     {
         $id = $this->inserir(<<<'SQL'
             INSERT INTO usuario_sistema (organizacao_id, nome, email, senha_hash)
@@ -149,28 +149,30 @@ final class AutenticacaoTest extends BancoTestCase
         self::assertTrue($usuario?->emModoPlataforma());
         self::assertSame([Papel::Plataforma], $usuario->papeis);
 
-        self::assertTrue($this->autenticacao->entrarNaOrganizacao(self::organizacaoTeste()));
-        $usuario = $this->autenticacao->usuario();
-        self::assertTrue($usuario?->emModoSuporte());
-        self::assertSame([Papel::Administrador], $usuario->papeis);
-
-        // A entrada fica na auditoria da própria organização, visível ao cliente.
-        $consulta = $this->pdo->prepare(
-            "SELECT organizacao_id FROM auditoria WHERE acao = 'acesso_suporte' AND usuario_id = :u"
-        );
-        $consulta->execute(['u' => $id]);
-        self::assertSame(self::organizacaoTeste(), $consulta->fetchColumn());
-
-        $this->autenticacao->sairDaOrganizacao();
-        self::assertTrue($this->autenticacao->usuario()?->emModoPlataforma());
+        // A plataforma não entra no ambiente do cliente: sessão com organização é derrubada.
+        $this->sessao->definir('organizacao_id', self::organizacaoTeste());
+        $this->autenticacao->recarregar();
+        self::assertNull($this->autenticacao->usuario());
     }
 
-    public function testUsuarioDeOrganizacaoNaoEntraEmOutraOrganizacao(): void
+    public function testEmailNaoConfirmadoNaoEntra(): void
+    {
+        $this->pdo->prepare('UPDATE usuario_sistema SET email_verificado_em = NULL WHERE id = :id')
+            ->execute(['id' => $this->usuarioId]);
+
+        self::assertSame(
+            Autenticacao::EMAIL_NAO_CONFIRMADO,
+            $this->autenticacao->entrar('operador@exemplo.com', self::SENHA),
+        );
+        self::assertNull($this->sessao->obter('usuario_id'));
+        // Com a senha errada, a resposta é a genérica (não revela que a conta existe).
+        self::assertSame(Autenticacao::FALHA, $this->autenticacao->entrar('operador@exemplo.com', 'errada'));
+    }
+
+    public function testUsuarioDeOrganizacaoNaoTrocaDeOrganizacao(): void
     {
         $outra = $this->criarOrganizacao('Outra Organização');
         $this->autenticacao->entrar('operador@exemplo.com', self::SENHA);
-
-        self::assertFalse($this->autenticacao->entrarNaOrganizacao($outra));
 
         // Sessão adulterada para outra organização: o usuário é desconectado.
         $this->sessao->definir('organizacao_id', $outra);

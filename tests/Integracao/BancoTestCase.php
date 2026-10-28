@@ -256,6 +256,11 @@ abstract class BancoTestCase extends TestCase
             $organizacao = $pdo->query("INSERT INTO organizacao (nome) VALUES ('Organização de teste') RETURNING id");
             self::$organizacaoTeste = (string) $organizacao->fetchColumn();
             $pdo->prepare('SELECT cg_provisionar_organizacao(:id)')->execute(['id' => self::$organizacaoTeste]);
+            // Assinatura ativa no maior plano: os testes não esbarram em limites, salvo quando querem.
+            $pdo->prepare(<<<'SQL'
+                INSERT INTO assinatura (organizacao_id, plano_id, status)
+                SELECT :id, id, 'ativa' FROM plano WHERE codigo = 'empresarial'
+                SQL)->execute(['id' => self::$organizacaoTeste]);
 
             self::$ambiente = $ambiente;
             self::$pdoOwner = $pdo;

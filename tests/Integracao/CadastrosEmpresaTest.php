@@ -6,6 +6,7 @@ namespace CadGestor\Testes\Integracao;
 
 use CadGestor\Nucleo\Contexto;
 use CadGestor\Nucleo\ErroValidacao;
+use CadGestor\Repositorios\AssinaturaRepositorio;
 use CadGestor\Repositorios\CatracaRepositorio;
 use CadGestor\Repositorios\EmpresaRepositorio;
 use CadGestor\Repositorios\PerfilRepositorio;
@@ -13,6 +14,7 @@ use CadGestor\Repositorios\RegraAcessoRepositorio;
 use CadGestor\Servicos\Auditoria;
 use CadGestor\Servicos\CatracaServico;
 use CadGestor\Servicos\EmpresaServico;
+use CadGestor\Servicos\LimitesPlano;
 use CadGestor\Servicos\RegraAcessoServico;
 
 /**
@@ -37,7 +39,8 @@ final class CadastrosEmpresaTest extends BancoTestCase
         $perfilRepo = new PerfilRepositorio($this->pdo);
 
         $this->empresas = new EmpresaServico($this->pdo, $this->empresaRepo, $perfilRepo, $auditoria);
-        $this->catracas = new CatracaServico($this->pdo, $this->catracaRepo, $this->empresaRepo, $auditoria);
+        $limites = new LimitesPlano(new AssinaturaRepositorio($this->pdo));
+        $this->catracas = new CatracaServico($this->pdo, $this->catracaRepo, $this->empresaRepo, $auditoria, $limites);
         $this->regras = new RegraAcessoServico(
             $this->pdo,
             $regraRepo,

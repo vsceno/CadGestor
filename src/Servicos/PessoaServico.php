@@ -29,12 +29,14 @@ final class PessoaServico
         private readonly PDO $pdo,
         private readonly PessoaRepositorio $pessoas,
         private readonly Auditoria $auditoria,
+        private readonly LimitesPlano $limites,
     ) {
     }
 
     /** @param array<string, string> $entrada */
     public function criar(array $entrada): string
     {
+        $this->limites->garantirCapacidade('pessoas');
         $dados = $this->validar($entrada);
 
         return Transacao::executar($this->pdo, function () use ($dados): string {
@@ -66,6 +68,10 @@ final class PessoaServico
     public function definirAtivo(string $id, bool $ativo): void
     {
         $atual = $this->buscarEditavel($id);
+
+        if ($ativo && $atual['ativo'] !== true) {
+            $this->limites->garantirCapacidade('pessoas');
+        }
 
         Transacao::executar($this->pdo, function () use ($id, $ativo, $atual): void {
             $this->pessoas->definirAtivo($id, $ativo);

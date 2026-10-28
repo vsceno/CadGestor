@@ -17,6 +17,7 @@ final class LimitadorTentativas
     public const JANELA_MINUTOS = 15;
     public const MAXIMO_POR_EMAIL = 5;
     public const MAXIMO_POR_IP = 20;
+    public const MAXIMO_CADASTROS_POR_HORA = 5;
 
     public function __construct(
         private readonly PDO $pdo,
@@ -44,6 +45,32 @@ final class LimitadorTentativas
 
         return (int) $linha['por_email'] >= self::MAXIMO_POR_EMAIL
             || (int) $linha['por_ip'] >= self::MAXIMO_POR_IP;
+    }
+
+    /**
+     * Cadastro self-service: no máximo N contas novas por IP por hora (contra
+     * abuso do teste grátis). Usa a mesma tabela com um marcador próprio e
+     * sucesso = true, para não contar como falha de login.
+     */
+    public function excedeuCadastros(string $ip): bool
+    {
+        $consulta = $this->pdo->prepare(<<<'SQL'
+            SELECT count(*) FROM tentativa_login
+             WHERE email_hash = :marcador AND ip = CAST(:ip AS inet) AND data_hora > now() - interval '1 hour'
+            SQL);
+        $consulta->execute(['marcador' => $this->marcadorCadastro(), 'ip' => $ip]);
+
+        return (int) $consulta->fetchColumn() >= self::MAXIMO_CADASTROS_POR_HORA;
+    }
+
+    public function registrarCadastro(string $ip): void
+    {
+        $this->registrar($this->marcadorCadastro(), $ip, true);
+    }
+
+    private function marcadorCadastro(): string
+    {
+        return hash_hmac('sha256', '#cadastro-self-service', $this->segredo);
     }
 
     public function registrar(string $emailHash, string $ip, bool $sucesso): void

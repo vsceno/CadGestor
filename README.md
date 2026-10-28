@@ -216,6 +216,9 @@ ele for igual ao `DB_BANCO` do `.env`. Sem o banco de teste, esses testes são p
 | `IDENTIFICADOR_BIOMETRICO` | 6 | Adaptador do hardware: `simulado` ou o do fabricante |
 | `LIMIAR_CONFIANCA` | 7 | Confiança mínima (0 a 1) para aceitar a identificação (padrão 0.80) |
 | `RETENCAO_DIAS` | 9 | Dias após o fim do vínculo para excluir biometria e anonimizar o titular. **Provisório: validar com o jurídico** |
+| `PAGAMENTO_GATEWAY` | Comercial | `simulado` (só fora de produção) ou o adaptador do gateway real |
+| `PAGAMENTO_WEBHOOK_TOKEN` | Comercial | Segredo que autentica os avisos do gateway (64 hex) |
+| `MENSAGEIRO` | Comercial | `arquivo` (só fora de produção, grava em `storage/emails`) ou o provedor real |
 
 ## Decisões técnicas
 
@@ -229,7 +232,7 @@ ele for igual ao `DB_BANCO` do `.env`. Sem o banco de teste, esses testes são p
 
 | Papel | Acesso |
 |---|---|
-| `plataforma` | Só no modo plataforma: organizações (clientes), seus administradores e o modo suporte |
+| `plataforma` | Só a plataforma: clientes, planos, assinaturas e administradores dos clientes. Não acessa o ambiente dos clientes |
 | `administrador` | Tudo **na própria organização**, incluindo usuários, perfis, termos LGPD, auditoria e diagnóstico |
 | `cadastro_empresa` | Empresas, horários, catracas e regras de acesso por perfil |
 | `cadastro_pessoa` | Pessoas, vínculos, consentimento e biometria |
@@ -473,10 +476,10 @@ próprio banco de dados.
 | Plataforma | `NULL` | Cadastra organizações e o administrador de cada uma; vê só contagens (nenhum dado pessoal) |
 | Organização | preenchido | Trabalha só dentro da própria organização, conforme os papéis |
 
-- **Modo suporte:** a plataforma pode "Entrar (suporte)" numa organização e atuar
-  como administrador dela. Uma faixa amarela avisa disso no topo da tela. A entrada
-  e a saída ficam na **auditoria da própria organização**, visível ao cliente como
-  "Suporte da plataforma".
+- **A plataforma não entra no ambiente do cliente.** Ela só vende e controla os
+  planos (migração 0011). O modo suporte existiu na primeira versão e foi removido.
+  Se um cliente perder o administrador, a plataforma cria outro, e isso aparece na
+  auditoria do cliente como "Equipe da plataforma".
 - **O e-mail de login é único no sistema todo.** Já CPF, CNPJ, nome de perfil,
   identificador de catraca e versão de termo são únicos **dentro** da organização.
   A mesma prestadora de limpeza pode atender dois clientes, como cadastros separados.
@@ -498,6 +501,73 @@ o cliente certo. O resumo do job fica na auditoria da plataforma.
 **Instalações anteriores:** a migração 0010 move os dados existentes para a
 "Organização padrão" (pode ser renomeada em `/organizacoes`). O teste
 `IsolamentoOrganizacaoTest` verifica tudo isso com a conexão real da aplicação.
+
+### Comercial: planos, assinatura e cobrança (migração 0011)
+
+A plataforma é como a administradora de um shopping: vende e controla os contratos
+(planos), mas não entra nas lojas. Cada cliente é dono do próprio ambiente.
+
+**Fluxo de venda (self-service):**
+
+1. O cliente abre `/cadastro`, escolhe o plano e informa a razão social, o CNPJ e o
+   administrador (nome, e-mail e senha). Também aceita os Termos de Uso, o Contrato
+   de Tratamento de Dados e a Política de Privacidade. A versão aceita, a data e o
+   IP ficam gravados.
+2. O ambiente nasce pronto, numa única transação:
+   - perfis padrão e termo de consentimento modelo;
+   - assinatura em **teste grátis de 14 dias**;
+   - assinatura no gateway, com a primeira cobrança vencendo no fim do teste.
+3. O administrador recebe um e-mail de confirmação. O login só funciona depois de
+   clicar no link (o banco guarda só o hash do token; o link vale por 72 horas).
+4. O cliente configura tudo sozinho: empresas, catracas, pessoas e usuários.
+
+**Venda manual** (contrato fora do site): em `/organizacoes/nova`, a plataforma cria
+o cliente com a assinatura ativa, sem cobrança automática.
+
+**Planos** (`/planos`, só a plataforma): preço mensal e limites de **pessoas ativas** e
+**catracas ativas**. Os valores iniciais são **provisórios**: Básico R$ 199,00
+(100 pessoas, 2 catracas), Profissional R$ 499,00 (500 e 6) e Empresarial R$ 1.290,00
+(2.000 e 20). Os limites são conferidos ao cadastrar e ao reativar pessoas e catracas.
+Um downgrade só é aceito se o uso atual couber no plano novo.
+
+**"Minha assinatura"** (`/assinatura`): plano, uso, faturas com o link de pagamento,
+troca de plano, cancelamento (é preciso digitar CANCELAR) e **exportação dos
+cadastros em CSV**, disponível a qualquer momento.
+
+**Régua de inadimplência** (`Dominio\SituacaoAssinatura`, **prazos provisórios**). A
+situação é calculada na hora, sem depender de job:
+
+| Dias de atraso | Sistema | Catracas |
+|---|---|---|
+| 0 a 6 | Normal, com aviso | Funcionam |
+| 7 a 14 | Somente leitura | Funcionam |
+| 15 a 29 | Só "Minha assinatura" | **Funcionam** (bloquear a porta afeta terceiros) |
+| 30 ou mais / cancelada | Só "Minha assinatura" | Recusadas (API 403) |
+
+O teste grátis vencido sem pagamento conta como atraso a partir do dia seguinte.
+
+**Cobrança:** a interface `Cobranca\GatewayPagamento` tem uma implementação simulada,
+`GatewaySimulado`, que só funciona fora de produção. Nas faturas dela, "Pagar" abre
+`/pagamento-simulado/{id}`, onde é possível pagar, deixar vencer ou gerar a fatura
+seguinte. O gateway real entra como um adaptador em `src/Cobranca/Adaptadores`,
+escrito a partir da documentação oficial do gateway. **Nenhum dado de cartão passa
+pelo CadGestor.**
+
+**Webhook do gateway:** `POST /api/v1/pagamentos/webhook`.
+- **Autenticação:** é conferida pelo adaptador. No simulado, o cabeçalho
+  `X-Webhook-Token` deve ser igual a `PAGAMENTO_WEBHOOK_TOKEN`.
+- **Idempotência:** cada aviso tem um id único (`evento_gateway`). Um aviso
+  reenviado não é aplicado de novo.
+- **Organização:** o aviso chega sem organização. Ela é descoberta pela cobrança ou
+  pela assinatura do gateway, e o processamento roda dentro dela, com a auditoria
+  na trilha do cliente.
+
+**E-mail:** a interface `Mensagens\Mensageiro`. Em desenvolvimento, `MensageiroArquivo`
+grava arquivos `.eml` em `storage/emails/`, pasta fora do git porque contém dados
+pessoais. Em produção, é obrigatório configurar um provedor real.
+
+**Documentos jurídicos** (`/termos-de-uso`, `/contrato-dados`, `/privacidade`): são
+**MODELOS** (versão `1.0-modelo`) e precisam de revisão do advogado antes de vender.
 
 ### Modelo de dados (Fase 1)
 
@@ -552,4 +622,5 @@ o cliente certo. O resumo do job fica na auditoria da plataforma.
 - [x] Fase 7: API da catraca e motor de decisão
 - [x] Fase 8: relatórios, CSV e auditoria
 - [x] Fase 9: jobs de manutenção, testes e revisão de segurança
-- [x] Multi-tenant: organizações isoladas por RLS, plataforma e modo suporte
+- [x] Multi-tenant: organizações isoladas por RLS
+- [x] Comercial: planos, cadastro self-service, assinatura, cobrança (gateway simulado) e régua de inadimplência

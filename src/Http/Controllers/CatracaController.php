@@ -104,7 +104,14 @@ final class CatracaController extends Controlador
     public function alterarSituacao(Requisicao $requisicao, array $parametros): Resposta
     {
         $ativar = $requisicao->entrada('ativo') === '1';
-        $this->servico->definirAtivo($parametros['id'], $ativar);
+
+        try {
+            $this->servico->definirAtivo($parametros['id'], $ativar);
+        } catch (ErroValidacao $erro) {
+            return isset($erro->erros['id'])
+                ? $this->naoEncontrado()
+                : $this->redirecionar("/catracas/{$parametros['id']}/editar", implode(' ', $erro->erros), 'erro');
+        }
 
         return $this->redirecionar(
             "/catracas/{$parametros['id']}/editar",

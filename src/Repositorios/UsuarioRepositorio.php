@@ -120,6 +120,51 @@ final class UsuarioRepositorio
         return (string) $consulta->fetchColumn();
     }
 
+    /**
+     * Usuário do cadastro self-service: só entra depois de confirmar o e-mail.
+     * Do token, o banco guarda só o hash.
+     */
+    public function inserirAguardandoConfirmacao(
+        string $nome,
+        string $email,
+        string $senhaHash,
+        string $tokenHash,
+        string $expiraEm,
+    ): string {
+        $consulta = $this->pdo->prepare(<<<'SQL'
+            INSERT INTO usuario_sistema (nome, email, senha_hash, deve_trocar_senha, email_verificado_em,
+                                         verificacao_token_hash, verificacao_expira_em)
+            VALUES (:nome, :email, :hash, false, NULL, :token, CAST(:expira AS timestamptz))
+            RETURNING id
+            SQL);
+        $consulta->execute([
+            'nome' => $nome,
+            'email' => $email,
+            'hash' => $senhaHash,
+            'token' => $tokenHash,
+            'expira' => $expiraEm,
+        ]);
+
+        return (string) $consulta->fetchColumn();
+    }
+
+    /**
+     * Confirma o e-mail pelo token do link (chega sem sessão nem organização).
+     *
+     * @return array{usuario_id: string, organizacao_id: string}|null
+     */
+    public function confirmarEmail(string $tokenHash): ?array
+    {
+        $consulta = $this->pdo->prepare('SELECT usuario_id, organizacao_id FROM cg_confirmar_email(:token)');
+        $consulta->execute(['token' => $tokenHash]);
+        $linha = $consulta->fetch(PDO::FETCH_ASSOC);
+
+        return $linha === false ? null : [
+            'usuario_id' => (string) $linha['usuario_id'],
+            'organizacao_id' => (string) $linha['organizacao_id'],
+        ];
+    }
+
     public function atualizar(string $id, string $nome, string $email, bool $ativo): void
     {
         $this->pdo->prepare(

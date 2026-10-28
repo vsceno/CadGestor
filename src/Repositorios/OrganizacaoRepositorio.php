@@ -61,6 +61,28 @@ final class OrganizacaoRepositorio
         return (string) $consulta->fetchColumn();
     }
 
+    /** Cliente vindo do cadastro self-service, com o aceite dos Termos de Uso. */
+    public function inserirCliente(string $nome, string $cnpj, string $versaoTermos, string $ip): string
+    {
+        $consulta = $this->pdo->prepare(<<<'SQL'
+            INSERT INTO organizacao (nome, cnpj, termos_versao, termos_aceitos_em, termos_aceitos_ip)
+            VALUES (:nome, :cnpj, :versao, now(), CAST(:ip AS inet))
+            RETURNING id
+            SQL);
+        $consulta->execute(['nome' => $nome, 'cnpj' => $cnpj, 'versao' => $versaoTermos, 'ip' => $ip]);
+
+        return (string) $consulta->fetchColumn();
+    }
+
+    /** CNPJ já usado por algum cliente (consulta o sistema todo, não só a organização atual). */
+    public function cnpjEmUso(string $cnpj): bool
+    {
+        $consulta = $this->pdo->prepare('SELECT cg_cnpj_cliente_em_uso(:cnpj)');
+        $consulta->execute(['cnpj' => $cnpj]);
+
+        return (bool) $consulta->fetchColumn();
+    }
+
     /** Perfis padrão e termo modelo da organização nova (idempotente). */
     public function provisionar(string $id): void
     {

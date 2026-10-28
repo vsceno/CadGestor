@@ -103,8 +103,8 @@ final class UsuarioController extends Controlador
     }
 
     /**
-     * Só usuários da organização do contexto (a conta da plataforma, em modo
-     * suporte, não é editável por aqui).
+     * Só usuários da organização do contexto (contas da plataforma nunca são
+     * editáveis por aqui).
      *
      * @return array<string, mixed>|null
      */

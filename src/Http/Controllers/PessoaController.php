@@ -135,7 +135,9 @@ final class PessoaController extends Controlador
         try {
             $this->servico->definirAtivo($parametros['id'], $ativar);
         } catch (ErroValidacao $erro) {
-            return $this->redirecionar("/pessoas/{$parametros['id']}", $erro->getMessage(), 'erro');
+            return isset($erro->erros['id'])
+                ? $this->naoEncontrado()
+                : $this->redirecionar("/pessoas/{$parametros['id']}", implode(' ', $erro->erros), 'erro');
         }
 
         return $this->redirecionar(

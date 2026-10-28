@@ -14,14 +14,16 @@ use CadGestor\Servicos\Auditoria;
  * Login, logout e identificação do usuário da requisição.
  *
  * Também define, a cada requisição, a organização em que o banco vai operar
- * (ContextoBanco): a do usuário ou, para a plataforma, a organização em que
- * ele entrou em modo suporte.
+ * (ContextoBanco): a do usuário. O usuário da plataforma opera sempre fora das
+ * organizações (a plataforma só vende e controla planos; não entra no
+ * ambiente dos clientes).
  */
 final class Autenticacao
 {
     public const OK = 'ok';
     public const FALHA = 'falha';
     public const BLOQUEADO = 'bloqueado';
+    public const EMAIL_NAO_CONFIRMADO = 'email_nao_confirmado';
 
     /**
      * Hash Argon2id de uma senha aleatória descartada. Quando o e-mail não
@@ -47,7 +49,7 @@ final class Autenticacao
     ) {
     }
 
-    /** @return self::OK|self::FALHA|self::BLOQUEADO */
+    /** @return self::OK|self::FALHA|self::BLOQUEADO|self::EMAIL_NAO_CONFIRMADO */
     public function entrar(string $email, #[\SensitiveParameter] string $senha): string
     {
         $email = mb_strtolower(trim($email));
@@ -81,6 +83,13 @@ final class Autenticacao
         }
 
         $id = (string) $usuario['id'];
+
+        // Só depois da senha correta, para não revelar quais e-mails existem.
+        if ($usuario['email_verificado_em'] === null) {
+            $this->contextoBanco->limpar();
+
+            return self::EMAIL_NAO_CONFIRMADO;
+        }
 
         if ($this->hashSenha->precisaRefazer((string) $usuario['senha_hash'])) {
             $this->usuarios->definirSenha($id, $this->hashSenha->gerar($senha), (bool) $usuario['deve_trocar_senha']);
@@ -141,26 +150,23 @@ final class Autenticacao
 
         $daPlataforma = $dados['organizacao_id'] === null;
         $organizacao = $organizacaoId === null ? null : $this->organizacoes->buscar($organizacaoId);
-
         $organizacaoAtiva = ($organizacao['ativo'] ?? false) === true;
 
-        if (!$daPlataforma && ($dados['organizacao_id'] !== $organizacaoId || !$organizacaoAtiva)) {
+        // Usuário de organização: precisa estar na dele e ela, ativa. Plataforma: nunca dentro de uma.
+        $sessaoValida = $daPlataforma
+            ? $organizacaoId === null
+            : $dados['organizacao_id'] === $organizacaoId && $organizacaoAtiva;
+
+        if (!$sessaoValida) {
             return $this->encerrar();
         }
 
-        if ($daPlataforma && $organizacaoId !== null && $organizacao === null) {
-            // A organização do modo suporte não existe mais: volta ao modo plataforma.
-            $this->sessao->remover('organizacao_id');
-            $organizacaoId = null;
-        }
-
-        if ($daPlataforma && $organizacaoId === null) {
+        if ($daPlataforma) {
             $this->contextoBanco->definir(null, $id, true);
         }
 
         $papeis = match (true) {
-            $daPlataforma && $organizacaoId === null => [Papel::Plataforma],
-            $daPlataforma => [Papel::Administrador],
+            $daPlataforma => [Papel::Plataforma],
             default => array_values(array_filter(array_map(
                 static fn (string $papel): ?Papel => Papel::tryFrom($papel),
                 $dados['papeis'],
@@ -180,43 +186,6 @@ final class Autenticacao
         $this->contexto->usuarioId = $id;
 
         return $this->usuarioAtual;
-    }
-
-    /**
-     * Modo suporte: o usuário da plataforma passa a operar dentro da
-     * organização, como administrador dela. A entrada fica na auditoria da
-     * própria organização, visível para o cliente.
-     */
-    public function entrarNaOrganizacao(string $organizacaoId): bool
-    {
-        $usuario = $this->usuario();
-
-        if ($usuario === null || !$usuario->daPlataforma || $this->organizacoes->buscar($organizacaoId) === null) {
-            return false;
-        }
-
-        $this->sessao->definir('organizacao_id', $organizacaoId);
-        $this->contextoBanco->definir($organizacaoId, $usuario->id);
-        $this->auditoria->registrar('acesso_suporte', 'organizacao', $organizacaoId, null, ['evento' => 'entrada']);
-        $this->recarregar();
-
-        return true;
-    }
-
-    public function sairDaOrganizacao(): void
-    {
-        $usuario = $this->usuario();
-
-        if ($usuario === null || !$usuario->emModoSuporte()) {
-            return;
-        }
-
-        $this->auditoria->registrar('acesso_suporte', 'organizacao', $usuario->organizacaoId, null, [
-            'evento' => 'saida',
-        ]);
-        $this->sessao->remover('organizacao_id');
-        $this->contextoBanco->definir(null, $usuario->id, true);
-        $this->recarregar();
     }
 
     /** Recarrega o usuário (ex.: após trocar a senha). */

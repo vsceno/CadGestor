@@ -37,6 +37,7 @@ final class CatracaServico
         private readonly CatracaRepositorio $catracas,
         private readonly EmpresaRepositorio $empresas,
         private readonly Auditoria $auditoria,
+        private readonly LimitesPlano $limites,
     ) {
     }
 
@@ -51,6 +52,7 @@ final class CatracaServico
      */
     public function criar(array $entrada): array
     {
+        $this->limites->garantirCapacidade('catracas');
         $dados = $this->validar($entrada);
         $token = self::gerarToken();
 
@@ -97,6 +99,10 @@ final class CatracaServico
     public function definirAtivo(string $id, bool $ativo): void
     {
         $atual = $this->catracas->buscar($id) ?? throw ErroValidacao::campo('id', 'Catraca não encontrada.');
+
+        if ($ativo && $atual['ativo'] !== true) {
+            $this->limites->garantirCapacidade('catracas');
+        }
 
         Transacao::executar($this->pdo, function () use ($id, $ativo, $atual): void {
             $this->catracas->definirAtivo($id, $ativo);

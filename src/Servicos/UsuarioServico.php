@@ -135,7 +135,7 @@ final class UsuarioServico
 
     /**
      * Usuário editável pela tela de usuários: da organização do contexto. A
-     * conta de um usuário da plataforma (em modo suporte) não aparece aqui.
+     * conta de um usuário da plataforma nunca aparece aqui.
      *
      * @return array<string, mixed>
      */

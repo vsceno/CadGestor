@@ -45,10 +45,12 @@ final class AutenticacaoController extends Controlador
             return Resposta::redirecionar('/painel');
         }
 
-        $mensagem = $resultado === Autenticacao::BLOQUEADO
-            ? 'Muitas tentativas sem sucesso. Aguarde ' . LimitadorTentativas::JANELA_MINUTOS
-                . ' minutos e tente novamente.'
-            : 'E-mail ou senha inválidos.';
+        $mensagem = match ($resultado) {
+            Autenticacao::BLOQUEADO => 'Muitas tentativas sem sucesso. Aguarde ' . LimitadorTentativas::JANELA_MINUTOS
+                . ' minutos e tente novamente.',
+            Autenticacao::EMAIL_NAO_CONFIRMADO => 'Confirme seu e-mail pelo link que enviamos antes de entrar.',
+            default => 'E-mail ou senha inválidos.',
+        };
 
         return $this->pagina('autenticacao/login', [
             'titulo' => 'Entrar',

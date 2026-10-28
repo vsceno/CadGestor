@@ -110,6 +110,13 @@ if (!function_exists('e')) {
             . substr($cnpj, 8, 4) . '-' . substr($cnpj, 12, 2);
     }
 
+    /** Centavos (inteiro, sem arredondamento de ponto flutuante) para "R$ 1.290,00". */
+    function formatar_moeda(int $centavos): string
+    {
+        return 'R$ ' . number_format(intdiv($centavos, 100), 0, ',', '.') . ','
+            . str_pad((string) abs($centavos % 100), 2, '0', STR_PAD_LEFT);
+    }
+
     function formatar_cep(?string $cep): string
     {
         return $cep !== null && strlen($cep) === 8 ? substr($cep, 0, 5) . '-' . substr($cep, 5) : (string) $cep;

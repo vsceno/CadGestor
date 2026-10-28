@@ -6,9 +6,11 @@ namespace CadGestor\Testes\Integracao;
 
 use CadGestor\Nucleo\Contexto;
 use CadGestor\Nucleo\ErroValidacao;
+use CadGestor\Repositorios\AssinaturaRepositorio;
 use CadGestor\Repositorios\PessoaRepositorio;
 use CadGestor\Repositorios\VinculoRepositorio;
 use CadGestor\Servicos\Auditoria;
+use CadGestor\Servicos\LimitesPlano;
 use CadGestor\Servicos\PessoaServico;
 use CadGestor\Servicos\SincronizacaoServico;
 use CadGestor\Servicos\VinculoServico;
@@ -25,7 +27,12 @@ final class PessoasVinculosTest extends BancoTestCase
         $auditoria = new Auditoria($this->pdo, new Contexto('127.0.0.1'));
         $pessoaRepo = new PessoaRepositorio($this->pdo);
         $this->vinculoRepo = new VinculoRepositorio($this->pdo);
-        $this->pessoas = new PessoaServico($this->pdo, $pessoaRepo, $auditoria);
+        $this->pessoas = new PessoaServico(
+            $this->pdo,
+            $pessoaRepo,
+            $auditoria,
+            new LimitesPlano(new AssinaturaRepositorio($this->pdo)),
+        );
         $this->vinculos = new VinculoServico(
             $this->pdo,
             $this->vinculoRepo,

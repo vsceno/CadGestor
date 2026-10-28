@@ -71,7 +71,7 @@ final class LgpdRepositorio
     {
         $consulta = $this->pdo->prepare(<<<'SQL'
             SELECT c.*,
-                   COALESCE(u.nome, CASE WHEN c.registrado_por IS NOT NULL THEN 'Suporte da plataforma' END)
+                   COALESCE(u.nome, CASE WHEN c.registrado_por IS NOT NULL THEN 'Equipe da plataforma' END)
                        AS registrado_por_nome
               FROM consentimento c LEFT JOIN usuario_sistema u ON u.id = c.registrado_por
              WHERE c.pessoa_id = :p AND c.finalidade = :f AND c.revogado_em IS NULL

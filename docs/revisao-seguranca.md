@@ -90,8 +90,36 @@ CSP restritiva, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissi
 
 **Riscos residuais:**
 - O papel dono (`cadgestor_owner`) ignora o RLS. Os jobs filtram por organização no código e precisam de cuidado ao evoluir.
-- O modo suporte dá à plataforma acesso aos dados pessoais do cliente. Ele é auditado, mas o contrato com o cliente deve prever esse acesso (operador x controlador, LGPD art. 39).
+- ~~O modo suporte dá à plataforma acesso aos dados pessoais do cliente.~~ **Resolvido:** o modo suporte foi removido (migração 0011). A plataforma só vê dados comerciais e contagens.
 - `/diagnostico` (só fora de produção) mostra contagens de linhas das tabelas do sistema todo, com base em estatísticas do PostgreSQL.
+
+### 2.11 Comercial: planos, cadastro self-service e cobrança (migração 0011)
+- **Pagamento:** fica no gateway. Nenhum dado de cartão passa pelo CadGestor; só são guardados o id da cobrança, o valor, o vencimento e a situação. O link de pagamento só é aceito se começar com `https://` ou `/` (bloqueia `javascript:`).
+- **Webhook:**
+  - autenticidade conferida pelo adaptador (no simulado, o segredo é comparado com `hash_equals`);
+  - idempotente (`evento_gateway` com id único, sem UPDATE/DELETE para a aplicação);
+  - processado dentro da organização dona da cobrança, descoberta por função `SECURITY DEFINER` que devolve só o id.
+- **Cadastro self-service:**
+  - CSRF e senha com a mesma política dos usuários;
+  - CNPJ único entre clientes (contra testes grátis repetidos) e e-mail único no sistema;
+  - limite de 5 cadastros por IP por hora;
+  - e-mail obrigatoriamente confirmado antes do login (token de 256 bits, só o hash no banco, uso único, validade de 72 horas);
+  - a mensagem "e-mail não confirmado" só aparece com a senha correta, para não revelar quais contas existem.
+- **Aceite dos termos:** versão, data e IP gravados na organização (prova do aceite).
+- **Régua de inadimplência:**
+  - calculada na hora (não depende de job);
+  - a partir do 7º dia de atraso, o bloqueio de escrita é feito no servidor por middleware, não só na tela;
+  - as catracas só param no 30º dia de atraso ou no cancelamento.
+- **RLS nas tabelas novas:** `assinatura` e `fatura` têm isolamento por organização. O catálogo `plano` tem leitura pública, mas só a plataforma altera (teste em `IsolamentoOrganizacaoTest`).
+- **Sem gateway e e-mail de mentira em produção:** o container recusa o `GatewaySimulado` e o `MensageiroArquivo` em produção, e as rotas `/pagamento-simulado` só existem fora de produção.
+- **Portabilidade (LGPD, art. 18, V):** "Exportar cadastros (CSV)" fica disponível ao administrador do cliente, inclusive com a assinatura suspensa ou cancelada. A exportação é auditada.
+- **Corrigido:** o usuário da plataforma conseguia abrir `/assinatura` (página vazia, sem dados). Agora recebe 403.
+
+**Riscos residuais e pendências do comercial:**
+- O adaptador do gateway real ainda precisa ser escrito, com base na documentação oficial do gateway escolhido.
+- **Exclusão definitiva após o cancelamento:** o prazo está em aberto ("[prazo a definir]" no contrato). Hoje os dados permanecem e a exclusão é manual.
+- Ainda não existe reenvio do e-mail de confirmação. Se o link expirar, o comercial precisa intervir.
+- Os documentos jurídicos são modelos e precisam de revisão do advogado.
 
 ## 3. Correções feitas nesta revisão
 
@@ -115,6 +143,9 @@ Também corrigidos durante as fases (registrado nos commits):
 | Chave de cifra | Restringir com `icacls`; backup **separado** do backup do banco; plano de rotação |
 | `APP_AMBIENTE=producao` | Desliga o diagnóstico e o simulador e oculta detalhes de erro |
 | Job diário | Agendar `bin/manutencao.php` (ver README) |
+| Cobrança | Adaptador do gateway real em `PAGAMENTO_GATEWAY`; `PAGAMENTO_WEBHOOK_TOKEN` forte; URL do webhook só em HTTPS |
+| E-mail | Provedor real em `MENSAGEIRO`, com SPF, DKIM e DMARC no domínio |
+| Jurídico | Termos de Uso, Contrato de Tratamento de Dados e Política de Privacidade revisados antes de vender |
 | Proxy reverso | Se houver, ajustar `Requisicao::ip()` para um `X-Forwarded-For` confiável |
 
 ## 5. Riscos residuais e decisões pendentes (cliente/jurídico)
