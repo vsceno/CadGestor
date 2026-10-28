@@ -231,6 +231,7 @@ final class ComercialTest extends BancoTestCase
         return $this->cadastro->cadastrar($troca + [
             'razao_social' => 'Condomínio Exemplo Ltda',
             'cnpj' => '11.444.777/0001-61',
+            'telefone' => '(85) 3222-1100',
             'responsavel_nome' => 'Síndica Exemplo',
             'email' => 'admin@condominio.exemplo',
             'senha' => self::SENHA,

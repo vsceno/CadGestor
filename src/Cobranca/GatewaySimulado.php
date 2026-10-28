@@ -54,6 +54,15 @@ final class GatewaySimulado implements GatewayPagamento
     {
     }
 
+    public function registrarPagamentoManual(string $cobrancaId, DateTimeImmutable $pagoEm): void
+    {
+        // No gateway real, a cobrança é marcada como "recebida em dinheiro" e para de ser cobrada.
+    }
+
+    public function alterarVencimento(string $cobrancaId, DateTimeImmutable $vencimento): void
+    {
+    }
+
     public function interpretarWebhook(Requisicao $requisicao): ?EventoPagamento
     {
         $token = (string) $requisicao->cabecalho('X-Webhook-Token');

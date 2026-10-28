@@ -47,6 +47,12 @@
             <input type="text" id="cnpj" name="cnpj" value="<?= e($dados['cnpj'] ?? '') ?>" required maxlength="18"
                    data-mascara="cnpj"<?= invalido($erros, 'cnpj') ?>>
             <?= erro_campo($erros, 'cnpj') ?>
+
+            <label for="telefone">Telefone da empresa</label>
+            <input type="text" id="telefone" name="telefone" value="<?= e($dados['telefone'] ?? '') ?>" required maxlength="15"
+                   inputmode="tel" autocomplete="tel" data-mascara="telefone"<?= invalido($erros, 'telefone') ?>>
+            <p class="dica">Endereço e dados fiscais podem ser completados depois, em "Minha assinatura".</p>
+            <?= erro_campo($erros, 'telefone') ?>
         </fieldset>
 
         <fieldset>

@@ -118,8 +118,32 @@ CSP restritiva, `X-Frame-Options: DENY`, `nosniff`, `Referrer-Policy`, `Permissi
 **Riscos residuais e pendências do comercial:**
 - O adaptador do gateway real ainda precisa ser escrito, com base na documentação oficial do gateway escolhido.
 - **Exclusão definitiva após o cancelamento:** o prazo está em aberto ("[prazo a definir]" no contrato). Hoje os dados permanecem e a exclusão é manual.
-- Ainda não existe reenvio do e-mail de confirmação. Se o link expirar, o comercial precisa intervir.
 - Os documentos jurídicos são modelos e precisam de revisão do advogado.
+
+### 2.12 Cadastro do cliente, recuperação de senha e atendimento (migração 0012)
+
+- **A plataforma nunca vê nem define senhas.** Antes, a criação de um administrador pela plataforma mostrava uma senha provisória. Agora ela envia um link de uso único para o e-mail da pessoa. "Esqueci minha senha" e o envio pela plataforma usam o mesmo mecanismo.
+- **Tokens:**
+  - 256 bits aleatórios;
+  - no banco, só o hash SHA-256 (único, com expiração);
+  - uso único, garantido pela função `cg_redefinir_senha`, que consome o token no mesmo `UPDATE`;
+  - um link novo invalida o anterior;
+  - qualquer troca de senha também invalida o link pendente.
+- **Enumeração de contas:** "esqueci minha senha" responde sempre a mesma coisa. O reenvio da confirmação só é oferecido a quem acabou de acertar a senha.
+- **Abuso:** limites por hora de 3 por e-mail e 10 por IP (redefinição), e de 3 por conta (reenvio). Ficam em `tentativa_login`, com HMAC no lugar do e-mail.
+- **Sessões:** `credenciais_versao` na sessão. A troca de senha derruba as sessões abertas.
+  - Sessões abertas antes desta versão caem uma vez, no primeiro acesso após a implantação (comportamento esperado).
+- **Trava de login:** por e-mail, contam as falhas desde o último sucesso. Por IP, todas as da janela, para que um login certo numa conta não "limpe" quem tenta várias contas da mesma rede. As tentativas passam a usar `clock_timestamp()`, para que a ordem entre falhas e sucessos seja exata.
+- **Isolamento** (testes em `IsolamentoOrganizacaoTest`, com a conexão da aplicação):
+  - `organizacao_nota`: só a plataforma lê e grava, sempre em nome de quem está logado, e é só-acrescentar;
+  - `cg_historico_comercial` recusa quem não está no modo plataforma;
+  - `cg_atualizar_contato_organizacao` recusa quem não é administrador e só altera a própria organização.
+- **Ferramentas de atendimento:** rodam dentro da organização do cliente, então o RLS impede alcançar faturas e usuários de outro cliente. Há também uma conferência explícita de que o usuário pertence ao cliente e é administrador. Os motivos digitados vão para a auditoria do cliente, e a tela orienta a não escrever dados pessoais.
+- **Montagem de SQL com nomes de coluna** (`OrganizacaoRepositorio::inserir/atualizar`): só aceita colunas de uma lista fechada, conferida antes de montar o comando.
+
+**Pendências deste bloco:**
+- O envio de e-mail acontece dentro da requisição. Com um provedor real, o ideal é uma fila, para que o tempo de resposta não revele se o e-mail existe.
+- A baixa manual depende de o adaptador do gateway real implementar `registrarPagamentoManual` e `alterarVencimento`.
 
 ## 3. Correções feitas nesta revisão
 

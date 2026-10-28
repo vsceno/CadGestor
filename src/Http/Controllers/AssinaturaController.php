@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace CadGestor\Http\Controllers;
 
+use CadGestor\Dominio\DadosCadastraisCliente;
 use CadGestor\Nucleo\ErroValidacao;
 use CadGestor\Nucleo\Requisicao;
 use CadGestor\Nucleo\Resposta;
 use CadGestor\Repositorios\AssinaturaRepositorio;
 use CadGestor\Seguranca\Sessao;
 use CadGestor\Servicos\AssinaturaServico;
+use CadGestor\Servicos\DadosEmpresaServico;
 
 /**
  * "Minha assinatura": plano, uso, faturas, troca de plano, cancelamento e
@@ -22,6 +24,7 @@ final class AssinaturaController extends Controlador
         Sessao $sessao,
         private readonly AssinaturaRepositorio $assinaturas,
         private readonly AssinaturaServico $servico,
+        private readonly DadosEmpresaServico $dadosEmpresa,
     ) {
         parent::__construct($sessao);
     }
@@ -36,6 +39,7 @@ final class AssinaturaController extends Controlador
             'uso' => $this->assinaturas->uso(),
             'faturas' => $this->assinaturas->faturas(),
             'planos' => $this->assinaturas->planos(true),
+            'cadastroCompleto' => DadosCadastraisCliente::completo($this->dadosEmpresa->atual()),
         ]);
     }
 

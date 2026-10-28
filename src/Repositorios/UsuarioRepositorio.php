@@ -68,7 +68,7 @@ final class UsuarioRepositorio
     public function listar(?string $organizacaoId = null): array
     {
         $consulta = $this->pdo->prepare(<<<'SQL'
-            SELECT u.id, u.nome, u.email, u.ativo, u.deve_trocar_senha, u.ultimo_login_em,
+            SELECT u.id, u.nome, u.email, u.ativo, u.deve_trocar_senha, u.ultimo_login_em, u.email_verificado_em,
                    COALESCE(array_to_string(array_agg(p.papel ORDER BY p.papel), ','), '') AS papeis
               FROM usuario_sistema u
               LEFT JOIN usuario_papel p ON p.usuario_id = u.id
@@ -183,11 +183,88 @@ final class UsuarioRepositorio
         }
     }
 
-    public function definirSenha(string $id, string $hash, bool $deveTrocar): void
+    /**
+     * Grava a senha. $novaCredencial (padrão) incrementa a versão das
+     * credenciais, o que derruba as sessões abertas com a senha anterior e
+     * invalida um link de redefinição pendente. Só o recálculo do hash no
+     * login (mesma senha) passa false.
+     */
+    public function definirSenha(string $id, string $hash, bool $deveTrocar, bool $novaCredencial = true): void
     {
-        $this->pdo->prepare(
-            'UPDATE usuario_sistema SET senha_hash = :hash, deve_trocar_senha = :trocar WHERE id = :id'
-        )->execute(['id' => $id, 'hash' => $hash, 'trocar' => $deveTrocar ? 'true' : 'false']);
+        $this->pdo->prepare(<<<'SQL'
+            UPDATE usuario_sistema
+               SET senha_hash = :hash, deve_trocar_senha = :trocar,
+                   credenciais_versao = credenciais_versao + CASE WHEN :nova THEN 1 ELSE 0 END,
+                   redefinicao_token_hash = CASE WHEN :nova THEN NULL ELSE redefinicao_token_hash END,
+                   redefinicao_expira_em = CASE WHEN :nova THEN NULL ELSE redefinicao_expira_em END
+             WHERE id = :id
+            SQL)->execute([
+            'id' => $id,
+            'hash' => $hash,
+            'trocar' => $deveTrocar ? 'true' : 'false',
+            'nova' => $novaCredencial ? 'true' : 'false',
+        ]);
+    }
+
+    public function definirAtivo(string $id, bool $ativo): void
+    {
+        $this->pdo->prepare('UPDATE usuario_sistema SET ativo = :ativo WHERE id = :id')
+            ->execute(['id' => $id, 'ativo' => $ativo ? 'true' : 'false']);
+    }
+
+    /** Link de redefinição: guarda só o hash do token (um link novo substitui o anterior). */
+    public function definirTokenRedefinicao(string $id, string $tokenHash, string $expiraEm): void
+    {
+        $this->pdo->prepare(<<<'SQL'
+            UPDATE usuario_sistema
+               SET redefinicao_token_hash = :token, redefinicao_expira_em = CAST(:expira AS timestamptz)
+             WHERE id = :id
+            SQL)->execute(['id' => $id, 'token' => $tokenHash, 'expira' => $expiraEm]);
+    }
+
+    /** Reenvio da confirmação de e-mail: novo token, o anterior deixa de valer. */
+    public function definirTokenConfirmacao(string $id, string $tokenHash, string $expiraEm): void
+    {
+        $this->pdo->prepare(<<<'SQL'
+            UPDATE usuario_sistema
+               SET verificacao_token_hash = :token, verificacao_expira_em = CAST(:expira AS timestamptz)
+             WHERE id = :id AND email_verificado_em IS NULL
+            SQL)->execute(['id' => $id, 'token' => $tokenHash, 'expira' => $expiraEm]);
+    }
+
+    /**
+     * Conta dona de um link de redefinição válido (o link chega sem sessão).
+     *
+     * @return array{usuario_id: string, organizacao_id: ?string, email: string}|null
+     */
+    public function contaPorRedefinicao(string $tokenHash): ?array
+    {
+        $consulta = $this->pdo->prepare('SELECT usuario_id, organizacao_id, email FROM cg_conta_por_redefinicao(:t)');
+        $consulta->execute(['t' => $tokenHash]);
+        $linha = $consulta->fetch(PDO::FETCH_ASSOC);
+
+        return $linha === false ? null : [
+            'usuario_id' => (string) $linha['usuario_id'],
+            'organizacao_id' => $linha['organizacao_id'] === null ? null : (string) $linha['organizacao_id'],
+            'email' => (string) $linha['email'],
+        ];
+    }
+
+    /**
+     * Troca a senha pelo link (uso único) e devolve a conta, ou null se o link não vale mais.
+     *
+     * @return array{usuario_id: string, organizacao_id: ?string}|null
+     */
+    public function redefinirSenhaPorToken(string $tokenHash, string $senhaHash): ?array
+    {
+        $consulta = $this->pdo->prepare('SELECT usuario_id, organizacao_id FROM cg_redefinir_senha(:t, :h)');
+        $consulta->execute(['t' => $tokenHash, 'h' => $senhaHash]);
+        $linha = $consulta->fetch(PDO::FETCH_ASSOC);
+
+        return $linha === false ? null : [
+            'usuario_id' => (string) $linha['usuario_id'],
+            'organizacao_id' => $linha['organizacao_id'] === null ? null : (string) $linha['organizacao_id'],
+        ];
     }
 
     public function registrarLogin(string $id): void

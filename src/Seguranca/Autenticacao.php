@@ -33,6 +33,8 @@ final class Autenticacao
     private const HASH_FICTICIO =
         '$argon2id$v=19$m=65536,t=4,p=1$YmV1WmJLTjcxLjlnaEFiTA$xe0l7+i6rmT4bxChorI/XkqqvHxn4lzMz4udMJAxt+c';
 
+    private const CHAVE_REENVIO = 'reenvio_confirmacao';
+
     private ?UsuarioAutenticado $usuarioAtual = null;
     private bool $carregado = false;
 
@@ -87,12 +89,20 @@ final class Autenticacao
         // Só depois da senha correta, para não revelar quais e-mails existem.
         if ($usuario['email_verificado_em'] === null) {
             $this->contextoBanco->limpar();
+            // Senha conferida: esta sessão pode pedir o reenvio do e-mail de confirmação por alguns minutos.
+            $this->sessao->definir(self::CHAVE_REENVIO, ['usuario_id' => $id, 'expira' => time() + 600]);
 
             return self::EMAIL_NAO_CONFIRMADO;
         }
 
         if ($this->hashSenha->precisaRefazer((string) $usuario['senha_hash'])) {
-            $this->usuarios->definirSenha($id, $this->hashSenha->gerar($senha), (bool) $usuario['deve_trocar_senha']);
+            // Mesma senha, hash mais forte: não derruba as outras sessões.
+            $this->usuarios->definirSenha(
+                $id,
+                $this->hashSenha->gerar($senha),
+                (bool) $usuario['deve_trocar_senha'],
+                false,
+            );
         }
 
         $this->usuarios->registrarLogin($id);
@@ -100,6 +110,7 @@ final class Autenticacao
         $this->csrf->renovar();
         $this->sessao->definir('usuario_id', $id);
         $this->sessao->definir('organizacao_id', $conta['organizacao_id']);
+        $this->sessao->definir('credenciais_versao', (int) $usuario['credenciais_versao']);
         $this->contexto->usuarioId = $id;
         $this->carregado = false;
 
@@ -144,7 +155,10 @@ final class Autenticacao
 
         $dados = $this->usuarios->buscarPorId($id);
 
-        if ($dados === null || $dados['ativo'] !== true) {
+        // Senha trocada em outro lugar (link, administrador, outra sessão): esta sessão deixa de valer.
+        $versaoSessao = $this->sessao->obter('credenciais_versao');
+
+        if ($dados === null || $dados['ativo'] !== true || $versaoSessao !== (int) $dados['credenciais_versao']) {
             return $this->encerrar();
         }
 
@@ -193,6 +207,44 @@ final class Autenticacao
     {
         $this->carregado = false;
         $this->usuarioAtual = null;
+    }
+
+    /**
+     * Depois de o próprio usuário trocar a senha: as OUTRAS sessões caem, esta
+     * continua (passa a carregar a versão nova das credenciais).
+     */
+    public function manterSessaoAposTrocarSenha(): void
+    {
+        $id = $this->sessao->obter('usuario_id');
+        $dados = is_string($id) ? $this->usuarios->buscarPorId($id) : null;
+
+        if ($dados !== null) {
+            $this->sessao->definir('credenciais_versao', (int) $dados['credenciais_versao']);
+        }
+
+        $this->recarregar();
+    }
+
+    /** Conta que acabou de errar só a confirmação do e-mail (senha correta), se ainda dentro do prazo. */
+    public function contaAguardandoConfirmacao(): ?string
+    {
+        $pendente = $this->sessao->obter(self::CHAVE_REENVIO);
+
+        $valido = is_array($pendente) && is_string($pendente['usuario_id'] ?? null)
+            && ($pendente['expira'] ?? 0) >= time();
+
+        if (!$valido) {
+            $this->sessao->remover(self::CHAVE_REENVIO);
+
+            return null;
+        }
+
+        return $pendente['usuario_id'];
+    }
+
+    public function esquecerContaAguardandoConfirmacao(): void
+    {
+        $this->sessao->remover(self::CHAVE_REENVIO);
     }
 
     /** Usuários de organização só entram se ela estiver ativa. */

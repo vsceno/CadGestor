@@ -6,6 +6,7 @@
  * @var list<array<string, mixed>> $faturas
  * @var list<array<string, mixed>> $planos
  * @var \CadGestor\Seguranca\UsuarioAutenticado|null $usuario
+ * @var bool $cadastroCompleto
  */
 
 use CadGestor\Seguranca\Papel;
@@ -92,6 +93,17 @@ $classeFatura = ['pendente' => 'selo-aviso', 'paga' => 'selo-ok', 'vencida' => '
 <?php endif; ?>
 
 <?php if ($admin) : ?>
+    <section class="cartao cartao-medio">
+        <h2>Dados da empresa</h2>
+        <?php if (!$cadastroCompleto) : ?>
+            <div class="alerta alerta-aviso" role="status">Complete o endereço, o telefone e o e-mail financeiro: eles são
+                necessários para a emissão da nota fiscal.</div>
+        <?php else : ?>
+            <p>Endereço, inscrições e contatos usados na cobrança e na nota fiscal.</p>
+        <?php endif; ?>
+        <a class="botao" href="/assinatura/empresa">Editar dados da empresa</a>
+    </section>
+
     <section class="cartao cartao-medio">
         <h2>Seus dados</h2>
         <p>Baixe os cadastros de pessoas e vínculos (CSV). Os dados são da sua organização: você pode levá-los

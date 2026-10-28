@@ -41,6 +41,15 @@ interface GatewayPagamento
     public function cancelarAssinatura(string $assinaturaId): void;
 
     /**
+     * Pagamento recebido fora do gateway (Pix direto, transferência): avisa o
+     * gateway para ele não cobrar nem lembrar o cliente dessa fatura.
+     */
+    public function registrarPagamentoManual(string $cobrancaId, DateTimeImmutable $pagoEm): void;
+
+    /** Nova data de vencimento de uma cobrança ainda em aberto (ex.: teste grátis estendido). */
+    public function alterarVencimento(string $cobrancaId, DateTimeImmutable $vencimento): void;
+
+    /**
      * Confere a autenticidade do aviso e o traduz.
      *
      * @return EventoPagamento|null null = aviso que não nos interessa (responder 200 e ignorar)

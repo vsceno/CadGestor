@@ -216,6 +216,71 @@ final class IsolamentoOrganizacaoTest extends BancoTestCase
 
     // ---------------------------------------------------------------------
 
+    public function testAnotacoesEHistoricoComercialSoParaAPlataforma(): void
+    {
+        self::usarOrganizacao($this->app, null, true);
+        $plataforma = $this->app(<<<'SQL'
+            INSERT INTO usuario_sistema (organizacao_id, nome, email, senha_hash)
+            VALUES (NULL, 'Equipe', 'equipe@plataforma.exemplo', 'x') RETURNING id
+            SQL);
+        $this->app("INSERT INTO usuario_papel (usuario_id, papel) VALUES (:id, 'plataforma')", ['id' => $plataforma]);
+        $this->app("SELECT set_config('app.usuario_id', :id, true)", ['id' => $plataforma]);
+
+        $this->app(
+            "INSERT INTO organizacao_nota (organizacao_id, autor_id, texto) VALUES (:o, :a, 'Ligou pedindo desconto')",
+            ['o' => $this->orgA, 'a' => $plataforma],
+        );
+        self::assertSame(1, $this->contar('SELECT count(*) FROM organizacao_nota'));
+        $outro = $this->app(<<<'SQL'
+            INSERT INTO usuario_sistema (organizacao_id, nome, email, senha_hash)
+            VALUES (NULL, 'Outra pessoa', 'outra@plataforma.exemplo', 'x') RETURNING id
+            SQL);
+        self::assertSame('42501', $this->violacao(
+            "INSERT INTO organizacao_nota (organizacao_id, autor_id, texto) VALUES (:o, :a, 'Assinada por outro')",
+            ['o' => $this->orgA, 'a' => $outro],
+        ), 'A anotação sai sempre no nome de quem está logado.');
+        self::assertSame('42501', $this->violacao("UPDATE organizacao_nota SET texto = 'Editada'"), 'Só-acrescentar.');
+        $this->app('SELECT count(*) FROM cg_historico_comercial(:o)', ['o' => $this->orgA]);
+
+        // O cliente não enxerga as anotações nem consegue ler o histórico comercial.
+        self::usarOrganizacao($this->app, $this->orgA);
+        self::assertSame(0, $this->contar('SELECT count(*) FROM organizacao_nota'));
+        self::assertSame('42501', $this->violacao(
+            "INSERT INTO organizacao_nota (organizacao_id, autor_id, texto) VALUES (:o, :a, 'Do cliente')",
+            ['o' => $this->orgA, 'a' => $plataforma],
+        ));
+        self::assertSame('42501', $this->violacao('SELECT * FROM cg_historico_comercial(:o)', ['o' => $this->orgA]));
+    }
+
+    public function testClienteSoAtualizaContatosDaPropriaOrganizacaoESoSendoAdministrador(): void
+    {
+        $chamada = 'SELECT cg_atualizar_contato_organizacao(NULL, NULL, NULL, :cep, :rua, :num, NULL, :bairro, :cidade, '
+            . ":uf, :tel, 'fin@cliente.exemplo', NULL, NULL)";
+        $dados = ['cep' => '60115170', 'rua' => 'Rua A', 'num' => '1', 'bairro' => 'Centro', 'cidade' => 'Fortaleza',
+            'uf' => 'CE', 'tel' => '8532221100'];
+
+        self::usarOrganizacao($this->app, $this->orgA);
+        self::assertSame('42501', $this->violacao($chamada, $dados), 'Sem usuário logado.');
+
+        $consulta = $this->app("INSERT INTO usuario_sistema (nome, email, senha_hash) VALUES ('Consulta A', 'consulta@a.exemplo', 'x') RETURNING id");
+        $this->app("INSERT INTO usuario_papel (usuario_id, papel) VALUES (:id, 'consulta')", ['id' => $consulta]);
+        $this->app("SELECT set_config('app.usuario_id', :id, true)", ['id' => $consulta]);
+        self::assertSame('42501', $this->violacao($chamada, $dados), 'Papel consulta não altera o cadastro.');
+
+        $admin = $this->app("INSERT INTO usuario_sistema (nome, email, senha_hash) VALUES ('Admin A', 'admin@a.exemplo', 'x') RETURNING id");
+        $this->app("INSERT INTO usuario_papel (usuario_id, papel) VALUES (:id, 'administrador')", ['id' => $admin]);
+        $this->app("SELECT set_config('app.usuario_id', :id, true)", ['id' => $admin]);
+        $this->app($chamada, $dados);
+        self::assertSame('8532221100', $this->app('SELECT telefone FROM organizacao WHERE id = :id', ['id' => $this->orgA]));
+        self::assertSame('Cliente A', $this->app('SELECT nome FROM organizacao WHERE id = :id', ['id' => $this->orgA]));
+
+        // A outra organização não muda, e o admin de A não vira admin de B trocando o contexto.
+        self::usarOrganizacao($this->app, $this->orgB);
+        self::assertSame('42501', $this->violacao($chamada, $dados));
+        self::usarOrganizacao($this->app, null, true);
+        self::assertNull($this->app('SELECT telefone FROM organizacao WHERE id = :id', ['id' => $this->orgB]));
+    }
+
     private function novaEmpresa(): string
     {
         return $this->app(<<<'SQL'

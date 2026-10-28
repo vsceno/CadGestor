@@ -101,7 +101,8 @@ final class AssinaturaRepositorio
     {
         $linhas = $this->pdo->query(<<<'SQL'
             SELECT a.organizacao_id, a.status, a.teste_ate::text AS teste_ate,
-                   a.inadimplente_desde::text AS inadimplente_desde, p.nome AS plano_nome, p.preco_centavos
+                   a.inadimplente_desde::text AS inadimplente_desde, p.codigo AS plano_codigo, p.nome AS plano_nome,
+                   p.preco_centavos
               FROM assinatura a JOIN plano p ON p.id = a.plano_id
             SQL)->fetchAll(PDO::FETCH_ASSOC);
 
@@ -224,6 +225,47 @@ final class AssinaturaRepositorio
                    pago_em = CASE WHEN CAST(:s AS varchar) = 'paga' THEN COALESCE(pago_em, now()) END
              WHERE gateway = :g AND gateway_cobranca_id = :c AND status <> 'paga'
             SQL)->execute(['s' => $status, 'g' => $gateway, 'c' => $cobrancaId]);
+    }
+
+    /** Fatura da organização do contexto (o RLS esconde as de outras). @return array<string, mixed>|null */
+    public function fatura(string $id): ?array
+    {
+        $consulta = $this->pdo->prepare(<<<'SQL'
+            SELECT id, assinatura_id, gateway, gateway_cobranca_id, valor_centavos, vencimento::text AS vencimento,
+                   status
+              FROM fatura WHERE id = :id AND organizacao_id = cg_org_atual()
+            SQL);
+        $consulta->execute(['id' => $id]);
+
+        return $consulta->fetch(PDO::FETCH_ASSOC) ?: null;
+    }
+
+    public function marcarFaturaPaga(string $id): void
+    {
+        $this->pdo->prepare(<<<'SQL'
+            UPDATE fatura SET status = 'paga', pago_em = now() WHERE id = :id AND status IN ('pendente', 'vencida')
+            SQL)->execute(['id' => $id]);
+    }
+
+    public function definirVencimento(string $id, string $vencimento): void
+    {
+        $this->pdo->prepare(<<<'SQL'
+            UPDATE fatura SET vencimento = CAST(:v AS date) WHERE id = :id AND status = 'pendente'
+            SQL)->execute(['id' => $id, 'v' => $vencimento]);
+    }
+
+    public function definirFimTeste(string $id, string $testeAte): void
+    {
+        $this->pdo->prepare("UPDATE assinatura SET teste_ate = CAST(:t AS date) WHERE id = :id AND status = 'teste'")
+            ->execute(['id' => $id, 't' => $testeAte]);
+    }
+
+    /** Há alguma fatura vencida (não paga) na organização do contexto? */
+    public function temFaturaVencida(): bool
+    {
+        return (bool) $this->pdo->query(<<<'SQL'
+            SELECT EXISTS (SELECT 1 FROM fatura WHERE status = 'vencida' AND organizacao_id = cg_org_atual())
+            SQL)->fetchColumn();
     }
 
     // --- Uso (para os limites do plano) ----------------------------------------

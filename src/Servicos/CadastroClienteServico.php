@@ -32,7 +32,7 @@ final class CadastroClienteServico
     /** Versão dos Termos de Uso/contrato de dados aceita no cadastro (MODELO, revisar com o jurídico). */
     public const VERSAO_TERMOS = '1.0-modelo';
     public const DIAS_TESTE = 14;
-    private const HORAS_VALIDADE_CONFIRMACAO = 72;
+    public const HORAS_VALIDADE_CONFIRMACAO = 72;
 
     public function __construct(
         private readonly PDO $pdo,
@@ -66,7 +66,13 @@ final class CadastroClienteServico
                 $nome = $this->organizacoes->nomeEmUso($dados['razao_social'])
                     ? $dados['razao_social'] . ' - ' . formatar_cnpj($dados['cnpj'])
                     : $dados['razao_social'];
-                $organizacaoId = $this->organizacoes->inserirCliente($nome, $dados['cnpj'], self::VERSAO_TERMOS, $ip);
+                $organizacaoId = $this->organizacoes->inserirCliente(
+                    $nome,
+                    $dados['cnpj'],
+                    $dados['telefone'],
+                    self::VERSAO_TERMOS,
+                    $ip,
+                );
                 $this->organizacoes->provisionar($organizacaoId);
 
                 $this->contextoBanco->dentroDe($organizacaoId, function () use ($dados, $token, $testeAte): void {
@@ -170,13 +176,14 @@ final class CadastroClienteServico
 
     /**
      * @param array<string, string> $entrada
-     * @return array{razao_social: string, cnpj: string, responsavel_nome: string, email: string,
+     * @return array{razao_social: string, cnpj: string, telefone: string, responsavel_nome: string, email: string,
      *     senha: string, plano: array<string, mixed>}
      */
     private function validar(array $entrada): array
     {
         $razao = trim(preg_replace('/\s+/u', ' ', $entrada['razao_social'] ?? '') ?? '');
         $cnpj = Cnpj::normalizar($entrada['cnpj'] ?? '');
+        $telefone = preg_replace('/\D/', '', $entrada['telefone'] ?? '') ?? '';
         $nome = trim(preg_replace('/\s+/u', ' ', $entrada['responsavel_nome'] ?? '') ?? '');
         $email = mb_strtolower(trim($entrada['email'] ?? ''));
         $senha = $entrada['senha'] ?? '';
@@ -191,6 +198,10 @@ final class CadastroClienteServico
             $erros['cnpj'] = 'CNPJ inválido.';
         } elseif ($this->organizacoes->cnpjEmUso($cnpj)) {
             $erros['cnpj'] = 'Este CNPJ já tem cadastro. Entre com o e-mail do administrador ou fale com o comercial.';
+        }
+
+        if (preg_match('/^\d{10,11}$/', $telefone) !== 1) {
+            $erros['telefone'] = 'Telefone da empresa com DDD (10 ou 11 dígitos).';
         }
 
         if (mb_strlen($nome) < 3 || mb_strlen($nome) > 150) {
@@ -226,6 +237,7 @@ final class CadastroClienteServico
         return [
             'razao_social' => $razao,
             'cnpj' => $cnpj,
+            'telefone' => $telefone,
             'responsavel_nome' => $nome,
             'email' => $email,
             'senha' => $senha,

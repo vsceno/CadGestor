@@ -12,12 +12,16 @@ use CadGestor\Http\Controllers\AlertaController;
 use CadGestor\Http\Controllers\ApiPagamentoController;
 use CadGestor\Http\Controllers\AssinaturaController;
 use CadGestor\Http\Controllers\CadastroController;
+use CadGestor\Http\Controllers\DadosEmpresaController;
 use CadGestor\Http\Controllers\PagamentoSimuladoController;
 use CadGestor\Http\Controllers\PlanoController;
 use CadGestor\Mensagens\Mensageiro;
 use CadGestor\Mensagens\MensageiroArquivo;
 use CadGestor\Repositorios\AssinaturaRepositorio;
 use CadGestor\Servicos\AssinaturaServico;
+use CadGestor\Servicos\AtendimentoClienteServico;
+use CadGestor\Servicos\DadosEmpresaServico;
+use CadGestor\Servicos\RecuperacaoContaServico;
 use CadGestor\Servicos\CadastroClienteServico;
 use CadGestor\Servicos\LimitesPlano;
 use CadGestor\Servicos\PagamentoServico;
@@ -159,9 +163,43 @@ return static function (Container $c, Aplicacao $app): void {
         $c->obter(OrganizacaoRepositorio::class),
         $c->obter(AssinaturaRepositorio::class),
         $c->obter(UsuarioServico::class),
+        $c->obter(UsuarioRepositorio::class),
+        $c->obter(RecuperacaoContaServico::class),
         $c->obter(ContextoBanco::class),
         $c->obter(Auditoria::class),
     ));
+    $c->registrar(RecuperacaoContaServico::class, static fn (Container $c): RecuperacaoContaServico =>
+        new RecuperacaoContaServico(
+            $pdo(),
+            $c->obter(UsuarioRepositorio::class),
+            $c->obter(OrganizacaoRepositorio::class),
+            $c->obter(ContextoBanco::class),
+            $c->obter(HashSenha::class),
+            $c->obter(LimitadorTentativas::class),
+            $c->obter(Mensageiro::class),
+            $c->obter(Auditoria::class),
+            $ambiente->texto('APP_URL'),
+        ));
+    $c->registrar(AtendimentoClienteServico::class, static fn (Container $c): AtendimentoClienteServico =>
+        new AtendimentoClienteServico(
+            $pdo(),
+            $c->obter(OrganizacaoRepositorio::class),
+            $c->obter(AssinaturaRepositorio::class),
+            $c->obter(UsuarioRepositorio::class),
+            $c->obter(GatewayPagamento::class),
+            $c->obter(RecuperacaoContaServico::class),
+            $c->obter(LimitadorTentativas::class),
+            $c->obter(ContextoBanco::class),
+            $c->obter(Auditoria::class),
+        ));
+    $c->registrar(DadosEmpresaServico::class, static fn (Container $c): DadosEmpresaServico => new DadosEmpresaServico(
+        $pdo(),
+        $c->obter(OrganizacaoRepositorio::class),
+        $c->obter(ContextoBanco::class),
+        $c->obter(Auditoria::class),
+    ));
+    $c->registrar(DadosEmpresaController::class, static fn (Container $c): DadosEmpresaController =>
+        new DadosEmpresaController($c->obter(Sessao::class), $c->obter(DadosEmpresaServico::class)));
 
     $c->registrar(SincronizacaoServico::class, static fn (): SincronizacaoServico => new SincronizacaoServico($pdo()));
     $c->registrar(PessoaServico::class, static fn (Container $c): PessoaServico => new PessoaServico(
@@ -238,6 +276,7 @@ return static function (Container $c, Aplicacao $app): void {
             $c->obter(Sessao::class),
             $c->obter(AssinaturaRepositorio::class),
             $c->obter(AssinaturaServico::class),
+            $c->obter(DadosEmpresaServico::class),
         ));
     $c->registrar(CadastroController::class, static fn (Container $c): CadastroController => new CadastroController(
         $c->obter(Sessao::class),
@@ -314,6 +353,7 @@ return static function (Container $c, Aplicacao $app): void {
             $c->obter(Sessao::class),
             $c->obter(Autenticacao::class),
             $c->obter(UsuarioServico::class),
+            $c->obter(RecuperacaoContaServico::class),
         ));
     $c->registrar(PainelController::class, static fn (Container $c): PainelController => new PainelController(
         $c->obter(Sessao::class),
@@ -341,6 +381,7 @@ return static function (Container $c, Aplicacao $app): void {
             $c->obter(UsuarioRepositorio::class),
             $c->obter(AssinaturaRepositorio::class),
             $c->obter(OrganizacaoServico::class),
+            $c->obter(AtendimentoClienteServico::class),
         ));
     $c->registrar(PerfilController::class, static fn (Container $c): PerfilController => new PerfilController(
         $c->obter(Sessao::class),

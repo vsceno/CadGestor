@@ -18,7 +18,7 @@ use CadGestor\Servicos\CadastroClienteServico;
  */
 final class CadastroController extends Controlador
 {
-    private const CAMPOS = ['razao_social', 'cnpj', 'responsavel_nome', 'email', 'plano'];
+    private const CAMPOS = ['razao_social', 'cnpj', 'telefone', 'responsavel_nome', 'email', 'plano'];
 
     public function __construct(
         Sessao $sessao,

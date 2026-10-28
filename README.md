@@ -569,6 +569,58 @@ pessoais. Em produção, é obrigatório configurar um provedor real.
 **Documentos jurídicos** (`/termos-de-uso`, `/contrato-dados`, `/privacidade`): são
 **MODELOS** (versão `1.0-modelo`) e precisam de revisão do advogado antes de vender.
 
+### Cadastro do cliente, recuperação de acesso e atendimento (migração 0012)
+
+**Cadastro completo do cliente.** Além de razão social e CNPJ, o cliente tem:
+- nome fantasia;
+- inscrições municipal e estadual (a municipal é exigida para emitir NFS-e);
+- endereço completo;
+- telefone;
+- e-mail financeiro;
+- responsável comercial.
+
+A validação fica num lugar só (`Dominio\DadosCadastraisCliente`). Quem pode editar o quê:
+- **Plataforma:** edita tudo em `/organizacoes/{id}/editar`. A venda manual exige o cadastro completo.
+- **Administrador do cliente:** edita endereço e contatos em "Minha assinatura > Dados da empresa", pela função do banco `cg_atualizar_contato_organizacao`. Essa função só altera esses campos e confere no próprio banco se quem chama é administrador da organização. Razão social e CNPJ continuam só com a plataforma, porque fazem parte do contrato.
+- **Cadastro pelo site:** pede também o telefone. O restante pode ser completado depois.
+
+**Senhas: ninguém vê nem escolhe a senha de outra pessoa.** Toda recuperação é por link
+enviado ao e-mail do próprio usuário:
+- **"Esqueci minha senha"** (`/esqueci-senha`):
+  - a resposta é sempre a mesma, exista ou não o e-mail;
+  - limites: 3 pedidos por e-mail e 10 por IP, por hora;
+  - o link vale 1 hora e é de uso único;
+  - o banco guarda só o hash do token;
+  - o token sai da URL e segue num campo oculto do formulário.
+- **Administrador criado pela plataforma:** em vez de mostrar uma senha provisória, a plataforma envia um link para a pessoa criar a própria senha (vale 72 horas).
+- **Toda troca de senha** incrementa `credenciais_versao` e derruba as sessões abertas. Isso vale para o link, para a redefinição feita pelo administrador e para a troca pela própria tela. Nesse último caso, só a sessão de quem trocou continua.
+- **Login travado** por tentativas erradas volta a funcionar depois de um login correto, de uma senha redefinida ou de um desbloqueio feito pela plataforma. As tentativas são só-acrescentar: o desbloqueio registra um "sucesso", não apaga nada.
+- **Reenvio da confirmação de e-mail:**
+  - na tela de login, só aparece depois que a pessoa acerta a senha;
+  - limite de 3 por hora;
+  - o link anterior deixa de valer.
+
+**Ferramentas de atendimento da plataforma** (`/organizacoes/{id}`). Todas rodam dentro da
+organização do cliente e ficam na auditoria **dele**, como "Equipe da plataforma":
+- **Administradores do cliente:**
+  - enviar link de nova senha;
+  - reenviar a confirmação de e-mail;
+  - desbloquear o login;
+  - desativar ou reativar.
+- **Assinatura:**
+  - trocar de plano, com motivo, desde que o uso atual caiba no plano novo;
+  - estender o teste grátis em até 30 dias, com motivo. A primeira cobrança acompanha o novo fim do teste.
+  - dar baixa manual em fatura paga por fora (Pix, transferência), com motivo.
+- **Anotações internas** (`organizacao_nota`): só a plataforma vê, por RLS. É uma tabela só-acrescentar.
+- **Histórico comercial:** vem da função `cg_historico_comercial`, que exige o modo plataforma. Ela devolve só ações comerciais e, dos dados, só chaves de uma lista fechada (plano, status, valores, datas, motivo, nomes de campos alterados). Nomes, e-mails e dados de pessoas nunca aparecem.
+- **Busca na lista de clientes** por razão social, nome fantasia, CNPJ, status e plano. A busca vai por POST, então o termo pesquisado não fica na URL.
+
+**Interface:** layout com menu lateral e CSS próprio em `public/assets/css/app.css`, sem
+frameworks nem fontes externas (a CSP só permite recursos do próprio servidor). Os ícones
+são SVG desenhados no próprio layout. Não foi usado Laravel: ele é um framework de
+servidor (rotas, banco, sessão) e não altera a aparência. Migrar exigiria reescrever o
+sistema e revalidar toda a segurança já testada.
+
 ### Modelo de dados (Fase 1)
 
 | Grupo | Tabelas |

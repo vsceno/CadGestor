@@ -14,6 +14,7 @@ use CadGestor\Http\Controllers\AlertaController;
 use CadGestor\Http\Controllers\ApiPagamentoController;
 use CadGestor\Http\Controllers\AssinaturaController;
 use CadGestor\Http\Controllers\CadastroController;
+use CadGestor\Http\Controllers\DadosEmpresaController;
 use CadGestor\Http\Controllers\PagamentoSimuladoController;
 use CadGestor\Http\Controllers\PlanoController;
 use CadGestor\Http\Controllers\ApiCatracaController;
@@ -96,6 +97,13 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
         $rotas->get('/login', $acao(AutenticacaoController::class, 'formulario'));
         $rotas->post('/login', $acao(AutenticacaoController::class, 'entrar'));
 
+        // Recuperação de acesso: sempre por link no e-mail do próprio usuário.
+        $rotas->get('/esqueci-senha', $acao(AutenticacaoController::class, 'formularioEsqueci'));
+        $rotas->post('/esqueci-senha', $acao(AutenticacaoController::class, 'solicitarRedefinicao'));
+        $rotas->get('/redefinir-senha', $acao(AutenticacaoController::class, 'formularioRedefinir'));
+        $rotas->post('/redefinir-senha', $acao(AutenticacaoController::class, 'redefinirSenha'));
+        $rotas->post('/confirmar-email/reenviar', $acao(AutenticacaoController::class, 'reenviarConfirmacao'));
+
         // Loja pública: contratação self-service e documentos jurídicos.
         $rotas->get('/cadastro', $acao(CadastroController::class, 'formulario'));
         $rotas->post('/cadastro', $acao(CadastroController::class, 'cadastrar'));
@@ -116,6 +124,8 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
                 $rotas->post('/assinatura/plano', $acao(AssinaturaController::class, 'trocarPlano'));
                 $rotas->post('/assinatura/cancelar', $acao(AssinaturaController::class, 'cancelar'));
                 $rotas->get('/assinatura/exportar', $acao(AssinaturaController::class, 'exportar'));
+                $rotas->get('/assinatura/empresa', $acao(DadosEmpresaController::class, 'editar'));
+                $rotas->post('/assinatura/empresa', $acao(DadosEmpresaController::class, 'atualizar'));
 
                 if (!$app->ambiente->emProducao()) {
                     $rotas->get('/pagamento-simulado/{id}', $acao(PagamentoSimuladoController::class, 'ver'));
@@ -137,6 +147,7 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
                 $rotas->post('/planos/{id}', $acao(PlanoController::class, 'atualizar'));
 
                 $rotas->get('/organizacoes', $acao(OrganizacaoController::class, 'index'));
+                $rotas->post('/organizacoes/busca', $acao(OrganizacaoController::class, 'index'));
                 $rotas->get('/organizacoes/nova', $acao(OrganizacaoController::class, 'novo'));
                 $rotas->post('/organizacoes', $acao(OrganizacaoController::class, 'criar'));
                 $rotas->get('/organizacoes/{id}', $acao(OrganizacaoController::class, 'ver'));
@@ -147,6 +158,28 @@ return static function (Roteador $rotas, Container $c, Aplicacao $app): void {
                     '/organizacoes/{id}/administradores',
                     $acao(OrganizacaoController::class, 'criarAdministrador'),
                 );
+
+                // Atendimento: assinatura, anotações e acesso dos administradores do cliente.
+                $rotas->post('/organizacoes/{id}/plano', $acao(OrganizacaoController::class, 'trocarPlano'));
+                $rotas->post('/organizacoes/{id}/teste', $acao(OrganizacaoController::class, 'estenderTeste'));
+                $rotas->post(
+                    '/organizacoes/{id}/faturas/{fatura}/baixa',
+                    $acao(OrganizacaoController::class, 'darBaixa'),
+                );
+                $rotas->post('/organizacoes/{id}/notas', $acao(OrganizacaoController::class, 'anotar'));
+                foreach (
+                    [
+                        'redefinicao' => 'enviarRedefinicao',
+                        'confirmacao' => 'reenviarConfirmacao',
+                        'desbloqueio' => 'desbloquearLogin',
+                        'situacao' => 'situacaoAdministrador',
+                    ] as $caminho => $metodo
+                ) {
+                    $rotas->post(
+                        '/organizacoes/{id}/usuarios/{usuario}/' . $caminho,
+                        $acao(OrganizacaoController::class, $metodo),
+                    );
+                }
             });
 
             // --- Alertas: consulta vê, administrador trata ------------------
