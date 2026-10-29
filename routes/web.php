@@ -8,7 +8,9 @@ use App\Http\Controllers\Auth\SessaoController;
 use App\Http\Controllers\Cadastro\CatracaController;
 use App\Http\Controllers\Cadastro\EmpresaController;
 use App\Http\Controllers\Cadastro\PerfilController;
+use App\Http\Controllers\Cadastro\PessoaController;
 use App\Http\Controllers\Cadastro\RegraController;
+use App\Http\Controllers\Cadastro\VinculoController;
 use App\Http\Controllers\ContratarController;
 use App\Http\Controllers\DesignSystemController;
 use App\Http\Controllers\InicioController;
@@ -127,6 +129,30 @@ Route::middleware(['auth', 'auth.session', 'troca.senha', 'assinatura'])->group(
         Route::whereUuid('perfil')->group(function (): void {
             Route::get('/perfis/{perfil}/editar', [PerfilController::class, 'editar'])->name('perfis.editar');
             Route::put('/perfis/{perfil}', [PerfilController::class, 'atualizar'])->name('perfis.atualizar');
+        });
+    });
+
+    // --- Pessoas e vínculos: cadastro e situação, nunca exclusão -----------
+    Route::middleware('papel:cadastro_pessoa')->group(function (): void {
+        Route::get('/pessoas', [PessoaController::class, 'index'])->name('pessoas.index');
+        Route::post('/pessoas/busca', [PessoaController::class, 'index'])->name('pessoas.busca');
+        Route::get('/pessoas/novo', [PessoaController::class, 'criar'])->name('pessoas.criar');
+        Route::post('/pessoas', [PessoaController::class, 'salvar'])->name('pessoas.salvar');
+
+        Route::whereUuid('pessoa')->group(function (): void {
+            Route::get('/pessoas/{pessoa}', [PessoaController::class, 'show'])->name('pessoas.show');
+            Route::get('/pessoas/{pessoa}/editar', [PessoaController::class, 'editar'])->name('pessoas.editar');
+            Route::put('/pessoas/{pessoa}', [PessoaController::class, 'atualizar'])->name('pessoas.atualizar');
+            Route::post('/pessoas/{pessoa}/situacao', [PessoaController::class, 'situacao'])->name('pessoas.situacao');
+            Route::post('/pessoas/{pessoa}/vinculos', [VinculoController::class, 'salvar'])->name('pessoas.vinculos.salvar');
+        });
+
+        Route::whereUuid('pessoa')->whereUuid('vinculo')->group(function (): void {
+            Route::get('/pessoas/{pessoa}/vinculos/{vinculo}/editar', [VinculoController::class, 'editar'])->name('pessoas.vinculos.editar');
+            Route::put('/pessoas/{pessoa}/vinculos/{vinculo}', [VinculoController::class, 'atualizar'])->name('pessoas.vinculos.atualizar');
+            Route::post('/pessoas/{pessoa}/vinculos/{vinculo}/suspender', [VinculoController::class, 'suspender'])->name('pessoas.vinculos.suspender');
+            Route::post('/pessoas/{pessoa}/vinculos/{vinculo}/reativar', [VinculoController::class, 'reativar'])->name('pessoas.vinculos.reativar');
+            Route::post('/pessoas/{pessoa}/vinculos/{vinculo}/encerrar', [VinculoController::class, 'encerrar'])->name('pessoas.vinculos.encerrar');
         });
     });
 
