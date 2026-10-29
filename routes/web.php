@@ -5,6 +5,7 @@ use App\Http\Controllers\Auth\ConfirmacaoEmailController;
 use App\Http\Controllers\Auth\RecuperacaoSenhaController;
 use App\Http\Controllers\Auth\SenhaController;
 use App\Http\Controllers\Auth\SessaoController;
+use App\Http\Controllers\ContratarController;
 use App\Http\Controllers\DesignSystemController;
 use App\Http\Controllers\InicioController;
 use App\Http\Controllers\Plataforma\ClienteController;
@@ -26,6 +27,16 @@ Route::middleware('guest')->group(function (): void {
     Route::get('/esqueci-senha', [RecuperacaoSenhaController::class, 'formulario'])->name('senha.esqueci');
     Route::post('/esqueci-senha', [RecuperacaoSenhaController::class, 'enviar']);
 });
+
+// Contratação pelo site e documentos jurídicos (públicos).
+Route::middleware('guest')->group(function (): void {
+    Route::get('/contratar', [ContratarController::class, 'formulario'])->name('contratar');
+    Route::post('/contratar', [ContratarController::class, 'cadastrar']);
+    Route::get('/contratar/enviado', [ContratarController::class, 'enviado'])->name('contratar.enviado');
+});
+Route::get('/termos-de-uso', [ContratarController::class, 'documento'])->name('documentos.termos');
+Route::get('/privacidade', [ContratarController::class, 'documento'])->name('documentos.privacidade');
+Route::get('/contrato-dados', [ContratarController::class, 'documento'])->name('documentos.contrato-dados');
 
 // Links dos e-mails: funcionam logado ou não.
 Route::get('/redefinir-senha', [RecuperacaoSenhaController::class, 'formularioRedefinir'])->name('senha.redefinir');

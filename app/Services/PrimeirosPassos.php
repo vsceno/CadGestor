@@ -27,7 +27,7 @@ class PrimeirosPassos
                 ! empty($empresa['cep']) && ! empty($empresa['telefone']) && ! empty($empresa['email_financeiro']), 'assinatura.empresa'],
             ['Empresas atendidas', 'Cadastre as empresas cujas pessoas vão ter acesso (a sua própria, prestadoras...).', $contar('empresa') > 0, 'empresas.index'],
             ['Catracas', 'Cadastre cada catraca e conecte o equipamento com o token gerado.', $contar('catraca') > 0, 'catracas.index'],
-            ['Perfis de acesso', 'Revise os perfis (funcionário, prestador, visitante...) e a base legal de cada um.', true, 'perfis.index'],
+            ['Perfis de acesso', 'Revise os perfis (funcionário, prestador, visitante...) e a base legal de cada um.', false, 'perfis.index'],
             ['Pessoas', 'Cadastre as pessoas e o vínculo de cada uma com uma empresa.', $contar('pessoa') > 0, 'pessoas.index'],
             ['Regras de acesso', 'Defina em quais catracas e horários cada perfil passa.', $contar('regra_acesso') > 0, 'regras.index'],
         ];
