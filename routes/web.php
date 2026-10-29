@@ -16,6 +16,9 @@ use App\Http\Controllers\DesignSystemController;
 use App\Http\Controllers\InicioController;
 use App\Http\Controllers\Lgpd\ConsentimentoController;
 use App\Http\Controllers\Lgpd\LgpdController;
+use App\Http\Controllers\Operacao\AuditoriaController;
+use App\Http\Controllers\Operacao\EventosController;
+use App\Http\Controllers\Operacao\RelatorioController;
 use App\Http\Controllers\Plataforma\ClienteController;
 use App\Http\Controllers\Plataforma\PlanoController;
 use App\Http\Controllers\PortariaController;
@@ -162,6 +165,22 @@ Route::middleware(['auth', 'auth.session', 'troca.senha', 'assinatura'])->group(
             Route::post('/pessoas/{pessoa}/vinculos/{vinculo}/reativar', [VinculoController::class, 'reativar'])->name('pessoas.vinculos.reativar');
             Route::post('/pessoas/{pessoa}/vinculos/{vinculo}/encerrar', [VinculoController::class, 'encerrar'])->name('pessoas.vinculos.encerrar');
         });
+    });
+
+    // --- Operação: eventos, alertas, relatórios e auditoria ----------------
+    Route::middleware('papel:consulta')->group(function (): void {
+        Route::get('/eventos', [EventosController::class, 'index'])->name('eventos.index');
+        Route::post('/eventos/busca', [EventosController::class, 'index'])->name('eventos.busca');
+        Route::whereUuid('alerta')->post('/alertas/{alerta}/tratar', [EventosController::class, 'tratarAlerta'])->name('alertas.tratar');
+
+        Route::get('/relatorios', [RelatorioController::class, 'index'])->name('relatorios.index');
+        Route::post('/relatorios/busca', [RelatorioController::class, 'index'])->name('relatorios.busca');
+    });
+
+    Route::middleware('papel:administrador')->group(function (): void {
+        Route::post('/relatorios/exportar', [RelatorioController::class, 'exportar'])->name('relatorios.exportar');
+        Route::get('/auditoria', [AuditoriaController::class, 'index'])->name('auditoria.index');
+        Route::post('/auditoria/busca', [AuditoriaController::class, 'index'])->name('auditoria.busca');
     });
 
     // --- Portaria ao vivo: só leitura ---------------------------------------
