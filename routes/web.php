@@ -5,6 +5,10 @@ use App\Http\Controllers\Auth\ConfirmacaoEmailController;
 use App\Http\Controllers\Auth\RecuperacaoSenhaController;
 use App\Http\Controllers\Auth\SenhaController;
 use App\Http\Controllers\Auth\SessaoController;
+use App\Http\Controllers\Cadastro\CatracaController;
+use App\Http\Controllers\Cadastro\EmpresaController;
+use App\Http\Controllers\Cadastro\PerfilController;
+use App\Http\Controllers\Cadastro\RegraController;
 use App\Http\Controllers\ContratarController;
 use App\Http\Controllers\DesignSystemController;
 use App\Http\Controllers\InicioController;
@@ -77,6 +81,53 @@ Route::middleware(['auth', 'auth.session', 'troca.senha', 'assinatura'])->group(
         Route::post('/planos', [PlanoController::class, 'salvar'])->name('planos.salvar');
         Route::get('/planos/{plano}/editar', [PlanoController::class, 'editar'])->whereUuid('plano')->name('planos.editar');
         Route::put('/planos/{plano}', [PlanoController::class, 'atualizar'])->whereUuid('plano')->name('planos.atualizar');
+    });
+
+    // --- Cadastros de acesso: empresas, catracas, perfis e regras ----------
+    Route::middleware('papel:cadastro_empresa')->group(function (): void {
+        Route::get('/empresas', [EmpresaController::class, 'index'])->name('empresas.index');
+        Route::get('/empresas/novo', [EmpresaController::class, 'criar'])->name('empresas.criar');
+        Route::post('/empresas', [EmpresaController::class, 'salvar'])->name('empresas.salvar');
+
+        Route::whereUuid('empresa')->group(function (): void {
+            Route::get('/empresas/{empresa}/editar', [EmpresaController::class, 'editar'])->name('empresas.editar');
+            Route::put('/empresas/{empresa}', [EmpresaController::class, 'atualizar'])->name('empresas.atualizar');
+            Route::post('/empresas/{empresa}/situacao', [EmpresaController::class, 'situacao'])->name('empresas.situacao');
+            Route::get('/empresas/{empresa}/configurar', [EmpresaController::class, 'configurar'])->name('empresas.configurar');
+            Route::put('/empresas/{empresa}/perfis', [EmpresaController::class, 'salvarPerfis'])->name('empresas.perfis.salvar');
+            Route::put('/empresas/{empresa}/horarios', [EmpresaController::class, 'salvarHorarios'])->name('empresas.horarios.salvar');
+        });
+
+        Route::get('/catracas', [CatracaController::class, 'index'])->name('catracas.index');
+        Route::get('/catracas/novo', [CatracaController::class, 'criar'])->name('catracas.criar');
+        Route::post('/catracas', [CatracaController::class, 'salvar'])->name('catracas.salvar');
+
+        Route::whereUuid('catraca')->group(function (): void {
+            Route::get('/catracas/{catraca}', [CatracaController::class, 'show'])->name('catracas.show');
+            Route::get('/catracas/{catraca}/editar', [CatracaController::class, 'editar'])->name('catracas.editar');
+            Route::put('/catracas/{catraca}', [CatracaController::class, 'atualizar'])->name('catracas.atualizar');
+            Route::post('/catracas/{catraca}/situacao', [CatracaController::class, 'situacao'])->name('catracas.situacao');
+            Route::post('/catracas/{catraca}/token', [CatracaController::class, 'renovarToken'])->name('catracas.token');
+        });
+
+        Route::get('/regras', [RegraController::class, 'index'])->name('regras.index');
+        Route::whereUuid('empresa')->whereUuid('perfil')->group(function (): void {
+            Route::get('/regras/{empresa}/{perfil}', [RegraController::class, 'editar'])->name('regras.editar');
+            Route::put('/regras/{empresa}/{perfil}', [RegraController::class, 'salvar'])->name('regras.salvar');
+        });
+
+        Route::get('/perfis', [PerfilController::class, 'index'])->name('perfis.index');
+    });
+
+    // Perfis definem a base legal do tratamento de dados: só o administrador altera.
+    Route::middleware('papel:administrador')->group(function (): void {
+        Route::get('/perfis/novo', [PerfilController::class, 'criar'])->name('perfis.criar');
+        Route::post('/perfis', [PerfilController::class, 'salvar'])->name('perfis.salvar');
+
+        Route::whereUuid('perfil')->group(function (): void {
+            Route::get('/perfis/{perfil}/editar', [PerfilController::class, 'editar'])->name('perfis.editar');
+            Route::put('/perfis/{perfil}', [PerfilController::class, 'atualizar'])->name('perfis.atualizar');
+        });
     });
 
     // --- Cliente: Minha assinatura (abre mesmo com o sistema suspenso) -----

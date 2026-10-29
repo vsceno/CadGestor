@@ -26,6 +26,7 @@ class Navegacao
         ['Portaria ao vivo', 'portaria', 'portaria', Papel::Consulta],
         ['Eventos e alertas', 'eventos.index', 'eventos', Papel::Consulta],
         ['Empresas', 'empresas.index', 'empresas', Papel::CadastroEmpresa],
+        ['Perfis de acesso', 'perfis.index', 'usuario', Papel::CadastroEmpresa],
         ['Catracas', 'catracas.index', 'catraca', Papel::CadastroEmpresa],
         ['Regras de acesso', 'regras.index', 'regras', Papel::CadastroEmpresa],
         ['Relatórios', 'relatorios.index', 'relatorios', Papel::Consulta],
