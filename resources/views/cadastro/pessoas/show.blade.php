@@ -68,6 +68,8 @@
     </x-cartao>
 
     <div class="flex max-w-4xl flex-col gap-6">
+        @include('cadastro.pessoas._consentimento')
+
         <x-cartao :preenchimento="false">
             <div class="p-5">
                 <div class="mb-4">

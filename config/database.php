@@ -97,6 +97,8 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'cadgestor',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Mesmo fuso da aplicação: datas gravadas pelo PHP (horário de parede) são lidas no fuso certo.
+            'timezone' => env('APP_TIMEZONE', 'America/Fortaleza'),
         ],
 
         /*
@@ -118,6 +120,8 @@ return [
             'prefix_indexes' => true,
             'search_path' => 'cadgestor',
             'sslmode' => env('DB_SSLMODE', 'prefer'),
+            // Mesmo fuso da aplicação: datas gravadas pelo PHP (horário de parede) são lidas no fuso certo.
+            'timezone' => env('APP_TIMEZONE', 'America/Fortaleza'),
         ],
 
         'sqlsrv' => [

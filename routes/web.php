@@ -14,6 +14,8 @@ use App\Http\Controllers\Cadastro\VinculoController;
 use App\Http\Controllers\ContratarController;
 use App\Http\Controllers\DesignSystemController;
 use App\Http\Controllers\InicioController;
+use App\Http\Controllers\Lgpd\ConsentimentoController;
+use App\Http\Controllers\Lgpd\LgpdController;
 use App\Http\Controllers\Plataforma\ClienteController;
 use App\Http\Controllers\Plataforma\PlanoController;
 use Illuminate\Support\Facades\Route;
@@ -145,6 +147,11 @@ Route::middleware(['auth', 'auth.session', 'troca.senha', 'assinatura'])->group(
             Route::put('/pessoas/{pessoa}', [PessoaController::class, 'atualizar'])->name('pessoas.atualizar');
             Route::post('/pessoas/{pessoa}/situacao', [PessoaController::class, 'situacao'])->name('pessoas.situacao');
             Route::post('/pessoas/{pessoa}/vinculos', [VinculoController::class, 'salvar'])->name('pessoas.vinculos.salvar');
+
+            Route::get('/pessoas/{pessoa}/consentimento', [ConsentimentoController::class, 'formulario'])->name('pessoas.consentimento.formulario');
+            Route::post('/pessoas/{pessoa}/consentimento', [ConsentimentoController::class, 'registrar'])->name('pessoas.consentimento.salvar');
+            Route::post('/pessoas/{pessoa}/consentimento/revogar', [ConsentimentoController::class, 'revogar'])->name('pessoas.consentimento.revogar');
+            Route::post('/pessoas/{pessoa}/biometria/excluir', [ConsentimentoController::class, 'excluirBiometrias'])->name('pessoas.biometria.excluir');
         });
 
         Route::whereUuid('pessoa')->whereUuid('vinculo')->group(function (): void {
@@ -154,6 +161,12 @@ Route::middleware(['auth', 'auth.session', 'troca.senha', 'assinatura'])->group(
             Route::post('/pessoas/{pessoa}/vinculos/{vinculo}/reativar', [VinculoController::class, 'reativar'])->name('pessoas.vinculos.reativar');
             Route::post('/pessoas/{pessoa}/vinculos/{vinculo}/encerrar', [VinculoController::class, 'encerrar'])->name('pessoas.vinculos.encerrar');
         });
+    });
+
+    // --- LGPD: termos e painel, só para o administrador -------------------
+    Route::middleware('papel:administrador')->group(function (): void {
+        Route::get('/lgpd', [LgpdController::class, 'index'])->name('lgpd.index');
+        Route::post('/lgpd/termos', [LgpdController::class, 'publicarTermo'])->name('lgpd.termos.publicar');
     });
 
     // --- Cliente: Minha assinatura (abre mesmo com o sistema suspenso) -----

@@ -4,6 +4,7 @@ namespace App\Providers;
 
 use App\Auth\ProvedorUsuarios;
 use App\Models\Usuario;
+use App\Services\Biometria\CifradorBiometria;
 use App\Support\ContextoBanco;
 use App\Support\Navegacao;
 use App\Support\PreferenciasInterface;
@@ -21,6 +22,11 @@ class AppServiceProvider extends ServiceProvider
     {
         // Um contexto de banco por requisição (o "crachá" do RLS).
         $this->app->scoped(ContextoBanco::class);
+
+        // A chave só é lida quando a biometria é usada: o resto do sistema roda sem ela.
+        $this->app->singleton(CifradorBiometria::class, fn (): CifradorBiometria => CifradorBiometria::doArquivo(
+            CifradorBiometria::resolverCaminho(config('biometria.chaves_arquivo'), base_path()),
+        ));
     }
 
     /**

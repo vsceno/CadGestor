@@ -3,9 +3,11 @@
 namespace App\Http\Controllers\Cadastro;
 
 use App\Http\Controllers\Controller;
+use App\Models\Biometria;
 use App\Models\Pessoa;
 use App\Services\Cadastro\PessoaServico;
 use App\Services\Cadastro\VinculoServico;
+use App\Services\Lgpd\ConsentimentoServico;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -57,11 +59,17 @@ class PessoaController extends Controller
             ->with('sucesso', 'Pessoa cadastrada. Agora vincule a empresa e o perfil.');
     }
 
-    public function show(Pessoa $pessoa, VinculoServico $vinculos): View
+    public function show(Pessoa $pessoa, VinculoServico $vinculos, ConsentimentoServico $consentimentos): View
     {
         return view('cadastro.pessoas.show', [
             'pessoa' => $pessoa->load(['vinculos.empresa', 'vinculos.perfil']),
             'opcoes' => $vinculos->opcoes(),
+            'consentimento' => $consentimentos->ativo($pessoa),
+            'biometrias' => Biometria::query()
+                ->where('pessoa_id', $pessoa->id)
+                ->where('ativo', true)
+                ->orderBy('tipo')
+                ->get(['tipo', 'dedo', 'created_at']),
         ]);
     }
 
