@@ -72,6 +72,14 @@ class BiometriaServico
                 bin2hex($cifra['cifrado']), bin2hex($cifra['nonce']), $cifra['versao'], $hash,
             ]);
 
+            // Envia o template às catracas em que a pessoa tem vínculo ativo.
+            DB::connection('pgsql')->insert(<<<'SQL'
+                INSERT INTO fila_sincronizacao (catraca_id, pessoa_id, biometria_id, operacao)
+                SELECT c.id, ?, ?, 'cadastrar'
+                  FROM catraca c
+                 WHERE c.ativo AND c.empresa_id IN (SELECT v.empresa_id FROM vinculo v WHERE v.pessoa_id = ? AND v.status = 'ativo')
+                SQL, [$pessoa->id, $id, $pessoa->id]);
+
             // Registra só o tipo e o dedo: nada do template.
             $this->auditoria->registrar('biometria_cadastrada', 'biometria', $id, null, [
                 'pessoa_id' => $pessoa->id,

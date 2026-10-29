@@ -18,6 +18,7 @@ use App\Http\Controllers\Lgpd\ConsentimentoController;
 use App\Http\Controllers\Lgpd\LgpdController;
 use App\Http\Controllers\Plataforma\ClienteController;
 use App\Http\Controllers\Plataforma\PlanoController;
+use App\Http\Controllers\PortariaController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -162,6 +163,9 @@ Route::middleware(['auth', 'auth.session', 'troca.senha', 'assinatura'])->group(
             Route::post('/pessoas/{pessoa}/vinculos/{vinculo}/encerrar', [VinculoController::class, 'encerrar'])->name('pessoas.vinculos.encerrar');
         });
     });
+
+    // --- Portaria ao vivo: só leitura ---------------------------------------
+    Route::middleware('papel:consulta')->get('/portaria', [PortariaController::class, 'index'])->name('portaria');
 
     // --- LGPD: termos e painel, só para o administrador -------------------
     Route::middleware('papel:administrador')->group(function (): void {

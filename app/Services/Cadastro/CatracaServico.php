@@ -40,7 +40,8 @@ class CatracaServico
         $token = self::gerarToken();
 
         $catraca = DB::connection('pgsql')->transaction(function () use ($dados, $token): Catraca {
-            $catraca = Catraca::query()->create($dados + ['token_hash' => self::hashToken($token)]);
+            // "ativo" vai explícito: o default do banco não volta para o modelo devolvido.
+            $catraca = Catraca::query()->create($dados + ['token_hash' => self::hashToken($token), 'ativo' => true]);
             $this->auditoria->registrar('criar', 'catraca', $catraca->id, null, $dados);
 
             return $catraca;

@@ -32,7 +32,8 @@ class EmpresaServico
         $dados = $this->validar($entrada);
 
         return DB::connection('pgsql')->transaction(function () use ($dados): Empresa {
-            $empresa = Empresa::query()->create($dados);
+            // "ativo" vai explícito: o default do banco não volta para o modelo devolvido.
+            $empresa = Empresa::query()->create($dados + ['ativo' => true]);
             $this->auditoria->registrar('criar', 'empresa', $empresa->id, null, $dados);
 
             return $empresa;

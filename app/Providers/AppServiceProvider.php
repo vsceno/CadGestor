@@ -8,8 +8,11 @@ use App\Services\Biometria\CifradorBiometria;
 use App\Support\ContextoBanco;
 use App\Support\Navegacao;
 use App\Support\PreferenciasInterface;
+use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 
@@ -53,6 +56,11 @@ class AppServiceProvider extends ServiceProvider
                 $view->with('navegacao', Navegacao::para($usuario));
             }
         });
+
+        // Catracas falam sem sessão e mandam heartbeat e eventos com frequência: o limite vale por token
+        // (guardado como hash na chave), com folga maior que o padrão de 60 por minuto.
+        RateLimiter::for('api', fn (Request $requisicao): Limit => Limit::perMinute(600)
+            ->by(hash('sha256', (string) ($requisicao->bearerToken() ?: $requisicao->ip()))));
 
         // Em produção, e-mail de verdade: nunca "log" (gravaria links de senha em arquivo).
         if ($this->app->isProduction() && in_array(config('mail.default'), ['log', 'array'], true)) {
